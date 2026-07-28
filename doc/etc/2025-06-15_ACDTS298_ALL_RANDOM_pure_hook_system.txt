@@ -1,0 +1,134 @@
+NOUVEAU DAY 68 - ACDTS298 ALL RANDOM RuleSet 纯钩子系统重构记录
+时间：2025-06-15
+操作：重构为纯钩子系统，彻底分离默认逻辑和RuleSet逻辑
+
+=== 问题分析 ===
+
+之前的方案仍然存在问题：
+1. 逻辑污染：在默认include文件中添加了只有特定RuleSet才需要的逻辑
+2. 代码重复：ruleset_override.func.php和默认include文件中出现了相同的随机化逻辑
+3. 维护困难：如果要修改随机化逻辑，需要在多个地方修改
+4. 违反设计原则：默认文件应该保持纯净，不包含特定RuleSet的逻辑
+
+=== 新的解决方案 ===
+
+采用**纯钩子系统**：
+1. 默认include文件只提供钩子接口，不包含任何RuleSet特定逻辑
+2. 所有RuleSet特定逻辑都在RuleSet文件中实现
+3. 通过函数存在性检测来调用钩子
+4. 完全分离默认逻辑和RuleSet逻辑
+
+=== 技术实现 ===
+
+1. **钩子接口设计**
+   - `ruleset_itemget_hook(&$data)`：物品获得前处理钩子
+   - `ruleset_itemmix_hook(&$data)`：合成物品前处理钩子
+   - `ruleset_should_randomize_item($imap, $iarea, $an)`：检查地图物品是否需要随机化
+   - `ruleset_should_randomize_npc($npc_pls)`：检查NPC是否需要随机化
+   - `ruleset_get_random_npc_location($plsnum)`：获取随机NPC位置
+
+2. **默认文件修改**
+   - include/game/itemmain.func.php：只添加钩子调用，不包含具体逻辑
+   - include/game/itemmix.func.php：只添加钩子调用，不包含具体逻辑
+   - include/system.func.php：只添加钩子调用，不包含具体逻辑
+
+3. **RuleSet文件实现**
+   - gamedata/ruleset/ACDTS_298SP4_AR/include/ruleset_functions.php：实现所有钩子函数
+   - 包含完整的随机化逻辑
+   - 使用is_all_random_mode()进行检测
+
+=== 修改的文件 ===
+
+1. **include/game/itemmain.func.php**
+   ```php
+   // RuleSet钩子：物品获得前处理
+   if(function_exists('ruleset_itemget_hook')) {
+       ruleset_itemget_hook($data);
+       extract($data,EXTR_REFS); // 重新提取可能被修改的变量
+   }
+   ```
+
+2. **include/game/itemmix.func.php**
+   ```php
+   // RuleSet钩子：合成物品前处理
+   if(function_exists('ruleset_itemmix_hook')) {
+       ruleset_itemmix_hook($data);
+       extract($data,EXTR_REFS); // 重新提取可能被修改的变量
+   }
+   ```
+
+3. **include/system.func.php**
+   ```php
+   // 地图物品刷新钩子
+   $force_random = function_exists('ruleset_should_randomize_item') && 
+                   ruleset_should_randomize_item($imap, $iarea, $an);
+   
+   // NPC刷新钩子
+   if(function_exists('ruleset_should_randomize_npc') && 
+      ruleset_should_randomize_npc($npc['pls'])) {
+       if(function_exists('ruleset_get_random_npc_location')) {
+           $npc['pls'] = ruleset_get_random_npc_location($plsnum);
+       }
+   }
+   ```
+
+4. **gamedata/ruleset/ACDTS_298SP4_AR/include/ruleset_functions.php**
+   - 实现了所有钩子函数
+   - 包含完整的随机化逻辑
+   - 使用数据引用传递修改物品属性
+
+=== 钩子函数详细说明 ===
+
+1. **ruleset_itemget_hook(&$data)**
+   - 在物品获得时调用
+   - 修改$data数组中的itme0、itms0、itmsk0
+   - 添加随机化提示信息
+
+2. **ruleset_itemmix_hook(&$data)**
+   - 在合成物品时调用
+   - 修改$data数组中的itme0、itms0、itmsk0
+   - 添加随机化提示信息
+
+3. **ruleset_should_randomize_item($imap, $iarea, $an)**
+   - 检查地图物品是否需要随机刷新
+   - 返回布尔值
+
+4. **ruleset_should_randomize_npc($npc_pls)**
+   - 检查NPC是否需要随机刷新
+   - 返回布尔值
+
+5. **ruleset_get_random_npc_location($plsnum)**
+   - 获取随机NPC位置
+   - 排除地点34
+   - 返回随机位置编号
+
+=== 优势 ===
+
+1. **完全分离**：默认文件和RuleSet逻辑完全分离
+2. **无逻辑污染**：默认文件保持纯净，只包含钩子接口
+3. **易于维护**：所有RuleSet逻辑都在一个文件中
+4. **高度可扩展**：可以轻松添加新的钩子和功能
+5. **向后兼容**：不影响其他RuleSet和普通房间
+6. **性能友好**：只在需要时调用钩子函数
+
+=== 设计原则 ===
+
+1. **单一职责**：每个钩子函数只负责一个特定功能
+2. **接口隔离**：钩子接口简洁明确
+3. **依赖倒置**：默认文件依赖抽象接口，不依赖具体实现
+4. **开闭原则**：对扩展开放，对修改封闭
+
+=== 测试要点 ===
+
+1. 验证ACDTS_298SP4_AR房间中的随机化功能是否正常
+2. 验证普通房间完全不受影响
+3. 验证钩子函数只在需要时被调用
+4. 验证数据传递和修改的正确性
+5. 验证随机化提示信息的显示
+
+=== 注意事项 ===
+
+1. 钩子函数使用引用传递修改数据
+2. 需要在钩子调用后重新extract变量
+3. 钩子函数应该进行必要的检查和验证
+4. 保持钩子接口的稳定性和向后兼容性

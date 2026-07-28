@@ -117,7 +117,8 @@ if($mode == 'enter') {
 	$arhe = $arae = $arfe = $arte = 0;
 	$arhs = $aras = $arfs = $arts = 0;
 	
-	for ($i=0; $i<=6; $i++){$itm[$i] = $itmk[$i] = $itmsk[$i] = ''; $itme[$i] = $itms[$i] = 0;}
+	for ($i=0; $i<=6; $i++){$itm[$i] = $itmk[$i] = $itmsk[$i] = $itmpara[$i] = ''; $itme[$i] = $itms[$i] = 0;}
+	$weppara = '';
 	$itm[1] = '面包'; $itmk[1] = 'HH'; $itme[1] = 120; $itms[1] = 15;
 	$itm[2] = '矿泉水'; $itmk[2] = 'HS'; $itme[2] = 140; $itms[2] = 15;
 	//$itm[6] = '银白盒子'; $itmk[6] = 'p'; $itme[6] = 1; $itms[6] = 1; $itmsk[6] = 'ps';
@@ -139,7 +140,9 @@ if($mode == 'enter') {
 	$weplist = openfile(config('stwep',$gamecfg));
 	do { 
 		$index = rand(1,count($weplist)-1); 
-		list($wep,$wepk,$wepe,$weps,$wepsk) = explode(",",$weplist[$index]);
+		$wline = rtrim($weplist[$index]);
+		$wline = preg_replace('/,\s*$/', '', $wline);
+		list($wep,$wepk,$wepe,$weps,$wepsk,$weppara) = array_pad(explode(",", $wline, 6), 6, '');
 	} while(!$wepk);
 
 	$stitemlist = openfile(config('stitem',$gamecfg));
@@ -149,7 +152,9 @@ if($mode == 'enter') {
 	} while(!$itmk[3]);*/
 	do { 
 		$index = rand(1,count($stitemlist)-1); 
-		list($itm[4],$itmk[4],$itme[4],$itms[4],$itmsk[4]) = explode(",",$stitemlist[$index]);
+		$iline = rtrim($stitemlist[$index]);
+		$iline = preg_replace('/,\s*$/', '', $iline);
+		list($itm[4],$itmk[4],$itme[4],$itms[4],$itmsk[4],$itmpara[4]) = array_pad(explode(",", $iline, 6), 6, '');
 	} while(!$itmk[4] || ($itmk[3] == $itmk[4]));
 
 	if ($name == 'Amarillo_NMC') {
@@ -185,6 +190,7 @@ if($mode == 'enter') {
 		{
 			${'itm'.$i} = $value; ${'itmk'.$i} = $itmk[$i]; ${'itme'.$i} = $itme[$i]; ${'itms'.$i} = $itms[$i];
 			if(isset($itmsk[$i])) ${'itmsk'.$i} = $itmsk[$i];
+			if(isset($itmpara[$i])) ${'itmpara'.$i} = $itmpara[$i];
 		}
 	}
 
@@ -196,6 +202,65 @@ if($mode == 'enter') {
 	include_once config('audio',$gamecfg);
 	$clbpara['valid_bgmbook'] = $regular_bgm;
 	$clbpara['bgmbook'] = $clbpara['valid_bgmbook'];
+
+	# 检查当前房间是否使用RuleSet
+	$ruleset_id = '';
+	if (isset($groomid)) {
+		$room_id = intval($groomid);
+		$result = $db->query("SELECT gruleset FROM {$gtablepre}game WHERE groomid = {$room_id}");
+		if ($db->num_rows($result)) {
+			$room_data = $db->fetch_array($result);
+			$ruleset_id = $room_data['gruleset'];
+		}
+	}
+
+	# 应用RuleSet初始化设置
+	if (!empty($ruleset_id)) {
+		include_once GAME_ROOT.'./gamedata/ruleset/ruleset_config.php';
+		$ruleset_config = get_ruleset_config($ruleset_id);
+		if ($ruleset_config && !empty($ruleset_config['initial_setup'])) {
+			$setup = $ruleset_config['initial_setup'];
+
+			# 应用初始属性设置
+			if (isset($setup['hp_limit'])) $mhp = $hp = $setup['hp_limit'];
+			if (isset($setup['sp_limit'])) $msp = $sp = $setup['sp_limit'];
+			if (isset($setup['base_exp'])) $exp = $areanum * $setup['base_exp'];
+			if (isset($setup['money'])) $money = $setup['money'];
+
+			# 应用初始装备
+			if (!empty($setup['initial_items'])) {
+				foreach ($setup['initial_items'] as $slot => $item_data) {
+					if (isset($item_data['name'])) $itm[$slot] = $item_data['name'];
+					if (isset($item_data['type'])) $itmk[$slot] = $item_data['type'];
+					if (isset($item_data['effect'])) $itme[$slot] = $item_data['effect'];
+					if (isset($item_data['durability'])) $itms[$slot] = $item_data['durability'];
+					if (isset($item_data['special'])) $itmsk[$slot] = $item_data['special'];
+				}
+			}
+
+			if (!empty($setup['initial_equipment'])) {
+				foreach ($setup['initial_equipment'] as $equip_slot => $equip_data) {
+					if (isset($equip_data['name'])) $$equip_slot = $equip_data['name'];
+					if (isset($equip_data['type'])) ${$equip_slot.'k'} = $equip_data['type'];
+					if (isset($equip_data['effect'])) ${$equip_slot.'e'} = $equip_data['effect'];
+					if (isset($equip_data['durability'])) ${$equip_slot.'s'} = $equip_data['durability'];
+					if (isset($equip_data['special'])) ${$equip_slot.'sk'} = $equip_data['special'];
+				}
+			}
+
+			# 应用clbpara标记
+			if (!empty($setup['clbpara_flags'])) {
+				foreach ($setup['clbpara_flags'] as $key => $value) {
+					$clbpara[$key] = $value;
+				}
+			}
+
+			# 设置开场剧情
+			if (!empty($ruleset_config['story_config']['opening_story'])) {
+				$clbpara['ruleset_opening_story'] = $ruleset_config['story_config']['opening_story'];
+			}
+		}
+	}
 
 	# 显示开场剧情模态框
 	$clbpara['noskip_dialogue'] = 'opening';

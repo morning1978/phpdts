@@ -1,5 +1,5 @@
-/*function hotkey(evt) 
-{ 
+/*function hotkey(evt)
+{
 	if(document.activeElement.tagName != 'INPUT'){
 		evt = (evt) ? evt : ((window.event) ? window.event : '');
 		var ky = evt.keyCode ? evt.keyCode : evt.which;
@@ -8,21 +8,21 @@
 				$('submit').click();
 			}
 		}
-	}	
+	}
 }*/
 
 var ms;
 hotkey_ok = true;
 refchat_ok = true;
-function hotkey(evt) 
-{ 
+function hotkey(evt)
+{
 	if(hotkey_ok && document.activeElement.tagName != 'INPUT'){
 		evt = (evt) ? evt : ((window.event) ? window.event : '');
 		var ky = evt.keyCode ? evt.keyCode : evt.which;
 		flag=1;//是否完成冷却
 		if (ms!=undefined) {
 			if (ms>0) flag=0;
-		}	
+		}
 		//双字母id=冷却时间内不可执行的操作 单字母可以执行
 		if(!evt.ctrlKey && !evt.altKey && !evt.shiftKey){
 			if(ky==90){
@@ -66,7 +66,7 @@ function hotkey(evt)
 				flag==1 ? hotkey_click(kc+kc) : hotkey_click(kc);
 			}
 		}
-	}	
+	}
 }
 
 function hotkey_click(hkid){
@@ -97,7 +97,7 @@ function updateTime(timing,mode)
 		setTimeout("updateTime(t,tm)",1000);
 	}
 	else{
-		window.location.reload(); 
+		window.location.reload();
 	}
 }
 
@@ -203,7 +203,7 @@ function sl(id) {
 //		} else{
 //			$(id).innerHTML = '';
 //		}
-//		
+//
 //	}
 //	if(gamedata['timer'] && typeof(timerid)=='undefined'){
 //		demiSecTimerStarter(gamedata['timer']);
@@ -240,7 +240,7 @@ function sl(id) {
 //			$(id).innerHTML = regdata[id];
 //		} else{
 //			$(id).innerHTML = '';
-//		}		
+//		}
 //	}
 //}
 
@@ -277,9 +277,9 @@ function sl(id) {
 
 //function showAlive(mode){
 //	//window.location.href = 'alive.php?alivemode=' + mode;
-//	
+//
 //	var oXmlHttp = zXmlHttp.createRequest();
-//	
+//
 //	oXmlHttp.open("post", "alive.php", true);
 //	oXmlHttp.setRequestHeader("Content-Type", "application/x-www-form-urlencoded");
 //	oXmlHttp.onreadystatechange = function () {
@@ -325,6 +325,14 @@ function postCmd(formName,sendto){
 	oXmlHttp.send(sBody);
 }
 
+// 更新背景图片函数
+function updateBackgroundImage(locationId) {
+	if (!locationId) return;
+	var bgUrl = "img/location/" + locationId + ".jpg";
+	document.body.style.backgroundImage = "url('" + bgUrl + "')";
+	document.body.style.backgroundPosition = "center";
+}
+
 function showData(sdata){
 	shwData = sdata.parseJSON();
 	if(shwData['url']) {
@@ -349,11 +357,48 @@ function showData(sdata){
 				}
 			}
 		}
+		if(shwData['clbpara']) {
+			window.clbpara_data = shwData['clbpara'];
+			window.clbpara = shwData['clbpara'];
+			if(typeof updateQuestPanel === 'function') {
+				updateQuestPanel();
+			}
+			if(typeof updateChargeProgressBars === 'function') {
+				updateChargeProgressBars();
+			}
+			if(typeof updateFireseedTab === 'function') {
+				updateFireseedTab();
+			}
+		}
 		sDd = shwData['display'];
 		for(var id in sDd){
 			if($(id)!=null){
-				
+
 				$(id).style.display = sDd[id];
+			}
+		}
+
+		// 检查位置是否更新，如果更新则更新背景图片
+		if(sDi['pls'] && CURSCRIPT === 'game') {
+			// 从位置文本中提取位置ID
+			var plsText = sDi['pls'];
+			var locationId = null;
+
+			// 尝试从command.php中获取位置ID
+			if(shwData['locationId']) {
+				locationId = shwData['locationId'];
+			} else {
+				// 如果没有直接提供位置ID，尝试从URL参数中获取
+				var urlParams = new URLSearchParams(window.location.search);
+				var moveto = urlParams.get('moveto');
+				if(moveto) {
+					locationId = moveto;
+				}
+			}
+
+			// 如果有位置ID，更新背景图片
+			if(locationId) {
+				updateBackgroundImage(locationId);
 			}
 		}
 	}
@@ -422,12 +467,12 @@ function openShutManager(oSourceObj,oTargetObj,shutAble,oOpenTip,oShutTip){
 	   if(shutAble) return;
 	   targetObj.style.display="none";
 	   if(openTip  &&  shutTip){
-	    sourceObj.innerHTML = shutTip; 
+	    sourceObj.innerHTML = shutTip;
 	   }
 	} else {
 	   targetObj.style.display="block";
 	   if(openTip  &&  shutTip){
-	    sourceObj.innerHTML = openTip; 
+	    sourceObj.innerHTML = openTip;
 	   }
 	}
 }
@@ -435,7 +480,7 @@ function openShutManager(oSourceObj,oTargetObj,shutAble,oOpenTip,oShutTip){
 //元素合成界面的ajax效果 仅作美化使用
 function getEmitmeR(type=0) {
 	if(type == 1)
-	{	
+	{
 		var r = document.getElementById("emitme_max_r").value;
 		var e = document.getElementById("emax").value;
 		$('s_emitme_max').innerHTML = Math.round(e*(r/100));
@@ -495,10 +540,10 @@ function AddMixElements(emix_arr) {
 	var numsarr = [];
 	var descarr = [];
 	const esum = [];
-	
+
 	for (let i = 0; i < emix_arr.length; i++) {
 		esum[emix_arr[i][0]] = (esum[emix_arr[i][0]] || 0) + emix_arr[i][1];
-	}		
+	}
 	for (let i = 0; i < emix_arr.length; i++) {
 		if($('maxe' + emix_arr[i][0] + 'num') === null || ($('maxe' + emix_arr[i][0] + 'num').value - esum[emix_arr[i][0]]) < 0) {
 			window.alert("合成所需的元素数量不足。");
@@ -518,7 +563,7 @@ function AddMixElements(emix_arr) {
 	$('emixinfotop').style.display = 'block';
 }
 
-function changeVolume(cv){ 
+function changeVolume(cv){
 	var v = $('gamebgm').volume;
 	v = v+cv;
 	v = Math.min(1,v); v = Math.max(0,v); 	v = v.toFixed(2);
@@ -577,14 +622,14 @@ function changePages(mode,cPages)
 function skill_unacquired_mouseover(e)
 {
 	var children = this.childNodes;
-	for (var i = 0; i < children.length; i++) 
+	for (var i = 0; i < children.length; i++)
 	{
 		var child = children[i];
-		if (child.className == 'skill_unacquired') 
+		if (child.className == 'skill_unacquired')
 		{
 			child.className = 'skill_unacquired_transparent';
 		}
-		if (child.className == 'skill_unacquired_hint') 
+		if (child.className == 'skill_unacquired_hint')
 		{
 			child.className = 'skill_unacquired_hint_transparent';
 		}
@@ -594,14 +639,14 @@ function skill_unacquired_mouseover(e)
 function skill_unacquired_mouseout(e)
 {
 	var children = this.childNodes;
-	for (var i = 0; i < children.length; i++) 
+	for (var i = 0; i < children.length; i++)
 	{
 		var child = children[i];
-		if (child.className == 'skill_unacquired_transparent') 
+		if (child.className == 'skill_unacquired_transparent')
 		{
-			child.className = 'skill_unacquired'; 
+			child.className = 'skill_unacquired';
 		}
-		if (child.className == 'skill_unacquired_hint_transparent') 
+		if (child.className == 'skill_unacquired_hint_transparent')
 		{
 			child.className = 'skill_unacquired_hint';
     	}
@@ -611,13 +656,13 @@ function skill_unacquired_mouseout(e)
 function selectRecordedFile() {
     var input = document.createElement("input");
     input.type = "file";
-    input.accept = ".gz"; 
+    input.accept = ".gz";
 
     input.click();
 
     // 处理选择的文件
     input.onchange = function (event) {
-        var file = event.target.files[0]; 
+        var file = event.target.files[0];
         console.log("选择的文件:", file);
 
         displayRecordedData(file);
@@ -665,7 +710,7 @@ function showPage(pageContent, currentPageIndex) {
     var progressBar = document.createElement('div');
     progressBar.className = 'progress-bar';
     progressBar.style.width = ((currentPageIndex + 1) / pageContent.length) * 100 + '%';
-    
+
     var progressBar = document.createElement('input');
     progressBar.type = 'range';
     progressBar.min = 0;
@@ -675,7 +720,7 @@ function showPage(pageContent, currentPageIndex) {
         currentPageIndex = parseInt(progressBar.value);
         showPage(pageContent, currentPageIndex);
     };
-    
+
     recordedDataDiv.insertBefore(progressBar, recordedDataDiv.firstChild);
     recordedDataDiv.insertBefore(nextPageButton, recordedDataDiv.firstChild);
     recordedDataDiv.insertBefore(previousPageButton, recordedDataDiv.firstChild);
@@ -712,7 +757,7 @@ function displayRecordedData(file) {
             showPage(pageContent, 0);
         };
         reader.readAsArrayBuffer(file);
-    } else { // 如果没有选择文件，则显示选择文件的提示消息 
+    } else { // 如果没有选择文件，则显示选择文件的提示消息
         var noticeDiv = document.getElementById('notice'); noticeDiv.textContent = '请先选择一个录像文件';
     }
 }
@@ -723,5 +768,4 @@ function displayRecordedData(file) {
         downloadRecordedData();
     }
 };*/
-  
-  
+

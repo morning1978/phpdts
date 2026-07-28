@@ -2,6 +2,9 @@
 if(!defined('IN_ADMIN')) {
 	exit('Access Denied');
 }
+
+// 引入主从同步功能
+include_once './include/masterslave.func.php';
 if(!isset($urcmd)){$urcmd = '';}
 if($urcmd){
 	if(!isset($start)){$start = 0;}
@@ -35,7 +38,7 @@ if($urcmd){
 		$resultinfo = '第'.$startno.'条-第'.$endno.'条记录';
 	}
 }
-if($urcmd == 'ban' || $urcmd == 'unban' || $urcmd == 'del' || $urcmd == 'sendmessage') {
+if($urcmd == 'ban' || $urcmd == 'unban' || $urcmd == 'del' || $urcmd == 'sendmessage' || $urcmd == 'reverse_migrate') {
 	$operlist = $gfaillist = $ffaillist = array();
 	for($i=0;$i<$showlimit;$i++){
 		if(isset(${'user_'.$i})) {
@@ -69,6 +72,8 @@ if($urcmd == 'ban' || $urcmd == 'unban' || $urcmd == 'del' || $urcmd == 'sendmes
 		}elseif($urcmd == 'del'){
 			$operword = '删除';
 			$qryword = "DELETE FROM {$gtablepre}users ";
+		}elseif($urcmd == 'reverse_migrate'){
+			$operword = '反向迁移';
 		}
 		if($operlist){
 			if($urcmd == 'sendmessage'){
@@ -79,13 +84,42 @@ if($urcmd == 'ban' || $urcmd == 'unban' || $urcmd == 'del' || $urcmd == 'sendmes
 				$opernames = implode(',',($operlist));
 				$cmd_info .= " 给帐户 $opernames 发送了邮件 。<br>";
 				adminlog($urcmd.'ur',$opernames,json_encode($stitle,$scontent,$senclosure));
+			}elseif($urcmd == 'reverse_migrate'){
+				// 处理反向迁移
+				if(!is_reverse_migration_mode()) {
+					$cmd_info .= " 错误：当前不是反向迁移模式 (slave_level != -1)。<br>";
+				} elseif(empty($master_password)) {
+					$cmd_info .= " 错误：请输入远端从服务器密码。<br>";
+				} elseif(empty($remote_username)) {
+					$cmd_info .= " 错误：请输入远端从服务器用户名。<br>";
+				} else {
+					$opernames = array();
+					$success_count = 0;
+					$fail_count = 0;
+
+					foreach($operlist as $uid => $username) {
+						// 使用本地用户名、远端用户名和密码进行反向迁移
+						$migrate_result = reverse_migrate_user($username, $remote_username, md5($master_password));
+						if($migrate_result['success']) {
+							$success_count++;
+							$opernames[] = $username . '(成功)';
+						} else {
+							$fail_count++;
+							$opernames[] = $username . '(失败: ' . $migrate_result['message'] . ')';
+						}
+					}
+
+					$opernames_str = implode(', ', $opernames);
+					$cmd_info .= " 反向迁移结果：成功 $success_count 个，失败 $fail_count 个。详情：$opernames_str<br>";
+					adminlog($urcmd.'ur', implode(',', array_values($operlist)), "成功:$success_count,失败:$fail_count");
+				}
 			}else{
 				$qrywhere = '('.implode(',',array_keys($operlist)).')';
 				$opernames = implode(',',($operlist));
 				$db->query("$qryword WHERE uid IN $qrywhere");
 				$cmd_info .= " 帐户 $opernames 被 $operword 。<br>";
 			}
-			
+
 		}
 		if($gfaillist){
 			$gfailnames = implode(',',($gfaillist));
@@ -171,6 +205,10 @@ if($urcmd == 'ban' || $urcmd == 'unban' || $urcmd == 'del' || $urcmd == 'sendmes
 	}
 	$urcmd = 'list';
 }
+
+// 设置反向迁移显示变量
+$show_reverse_migration = is_reverse_migration_mode();
+
 include template('admin_urlist');
 
 

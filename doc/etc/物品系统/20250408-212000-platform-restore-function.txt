@@ -1,0 +1,105 @@
+# NPC 平台恢复函数添加记录
+
+## 修改目标
+为 `item.platform.php` 文件添加一个新函数 `restorePlayerOriginalData`，用于将保存在玩家 `$clbpara` 中的原始数据重新赋值给玩家，以便在解除 NPC 变身时使用。
+
+## 原始功能说明
+原始的 `item.platform.php` 文件包含了以下功能：
+
+1. `item_platform` 函数：处理 NPC 平台物品的使用，允许玩家临时或永久地获取其他玩家或 NPC 的状态
+2. `extractPlatformPlayerData` 函数：从物品参数中提取预设的玩家数据
+3. `savePlayerOriginalData` 函数：保存玩家原始数据到 `$clbpara` 数组
+4. `applyPlatformDataToPlayer` 函数：将平台数据应用到玩家
+
+然而，原始文件中没有提供一个函数来恢复玩家的原始数据，这在解除 NPC 变身时是必要的。
+
+## 修改方法
+添加一个新函数 `restorePlayerOriginalData`，该函数将：
+
+1. 检查玩家的 `$clbpara` 中是否有保存的原始数据
+2. 如果有，将这些数据重新赋值给玩家
+3. 清除 `$clbpara` 中的变身标记和原始数据
+4. 返回是否成功恢复数据的布尔值
+
+## 改进点
+1. **完整的变身功能** - 现在 NPC 平台功能不仅可以让玩家变身为 NPC，还可以让玩家恢复原来的样子
+2. **数据清理** - 恢复原始数据后，会清除 `$clbpara` 中的变身标记和原始数据，避免数据冗余
+3. **错误处理** - 函数会检查是否有保存的原始数据，如果没有，会返回适当的错误信息
+4. **返回值** - 函数返回一个布尔值，表示是否成功恢复数据，方便调用者进行后续处理
+
+## 修改的文件
+1. `item.platform.php` - 添加了 `restorePlayerOriginalData` 函数
+
+## 函数详情
+```php
+/**
+ * 恢复玩家原始数据
+ * 用于解除NPC变身状态，将保存在clbpara中的原始数据重新赋值给玩家
+ *
+ * @param array &$data 玩家数据
+ * @return bool 是否成功恢复数据
+ */
+function restorePlayerOriginalData(&$data) {
+    global $log;
+    extract($data, EXTR_REFS);
+    
+    // 检查是否有保存的原始数据
+    if (!isset($clbpara['platformTransformed']) || $clbpara['platformTransformed'] !== true) {
+        $log .= "没有找到保存的原始数据，无法恢复。<br>";
+        return false;
+    }
+    
+    // 获取保存的字段列表
+    $fieldsToRestore = array(
+        'name', 'type', 'hp', 'mhp', 'sp', 'msp', 'att', 'def', 'pls', 'lvl', 'exp',
+        'money', 'rage', 'pose', 'tactic', 'club', 'icon', 'gender', 'sNo', 'teamID',
+        'wep', 'wepk', 'wepe', 'weps', 'wepsk', 'arb', 'arbk', 'arbe', 'arbs', 'arbsk',
+        'arh', 'arhk', 'arhe', 'arhs', 'arhsk', 'ara', 'arak', 'arae', 'aras', 'arask',
+        'arf', 'arfk', 'arfe', 'arfs', 'arfsk', 'art', 'artk', 'arte', 'arts', 'artsk',
+        'itm1', 'itmk1', 'itme1', 'itms1', 'itmsk1', 'itm2', 'itmk2', 'itme2', 'itms2', 'itmsk2',
+        'itm3', 'itmk3', 'itme3', 'itms3', 'itmsk3', 'itm4', 'itmk4', 'itme4', 'itms4', 'itmsk4',
+        'itm5', 'itmk5', 'itme5', 'itms5', 'itmsk5', 'itm6', 'itmk6', 'itme6', 'itms6', 'itmsk6',
+        'wep2', 'wep2k', 'wep2e', 'wep2s', 'wep2sk', 'wep2c', 'ss', 'mss', 'inf', 'skill',
+        'wp', 'wk', 'wg', 'wc', 'wd', 'wf', 'killnum', 'state'
+    );
+    
+    // 恢复原始数据
+    $restoredFields = 0;
+    foreach ($fieldsToRestore as $field) {
+        $oriField = 'ori' . ucfirst($field);
+        if (isset($clbpara[$oriField])) {
+            $$field = $clbpara[$oriField];
+            unset($clbpara[$oriField]); // 清除已恢复的数据
+            $restoredFields++;
+        }
+    }
+    
+    // 清除变身标记
+    unset($clbpara['platformTransformed']);
+    unset($clbpara['platformTransformTime']);
+    
+    // 记录恢复日志
+    if ($restoredFields > 0) {
+        $log .= "变身状态已解除，你恢复了原来的样子。<br>";
+        return true;
+    } else {
+        $log .= "尝试恢复原始数据，但没有找到有效的数据。<br>";
+        return false;
+    }
+}
+```
+
+## 使用示例
+```php
+// 解除NPC变身
+if (restorePlayerOriginalData($data)) {
+    // 变身成功解除，可以进行后续处理
+} else {
+    // 解除失败，可能没有保存的原始数据
+}
+```
+
+## 后续工作
+1. 创建一个解除变身的物品或命令，调用 `restorePlayerOriginalData` 函数
+2. 考虑添加一个自动解除变身的机制，例如在一定时间后自动解除变身
+3. 测试函数的功能，确保它能正确地恢复玩家的原始数据

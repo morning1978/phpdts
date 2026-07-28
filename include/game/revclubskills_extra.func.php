@@ -38,7 +38,9 @@
 			}
 			if($hp < $mhp || $sp < $msp)
 			{
-				$hp = $mhp; $sp = $msp;
+				//$hp = $mhp; $sp = $msp;
+				if($hp < $mhp){$hp = $mhp;}
+				if($sp < $msp){$sp = $msp;}
 				$heal_flag = 1;
 				$log .= "你的生命与体力完全恢复了！<br>";
 			}

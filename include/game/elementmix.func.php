@@ -495,6 +495,17 @@
 		}
 		extract($data,EXTR_REFS);
 		# 尝试元素合成时 合成操作计数+1
+		// 确保 clbpara 是数组
+		if(!is_array($clbpara)) {
+			if(is_string($clbpara)) {
+				$clbpara = json_decode($clbpara, true);
+			}
+			if(!is_array($clbpara)) {
+				$clbpara = array();
+			}
+		}
+		// 确保 achvars 数组存在
+		if(!isset($clbpara['achvars'])) $clbpara['achvars'] = array();
 		if(empty($clbpara['achvars']['immix'])) $clbpara['achvars']['immix'] = 1;
 
 		$log.="从口袋中抓出了：<br>";

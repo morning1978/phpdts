@@ -1,0 +1,90 @@
+时间戳: 2024-12-15 16:00:00 (NOUVEAU DAY -114)
+操作: 彻底修复RuleSet权限检查的变量作用域问题
+
+问题复现:
+用户报告在进行之前的修复后，"没有权限创建房间"的错误再次出现。
+调试文件显示：
+- ruleset_enabled => undefined
+- ruleset_config_exists => no
+- 说明全局变量在函数内部仍然无法正确访问
+
+根本原因分析:
+PHP的变量作用域机制导致在函数内部使用include_once时，被包含文件中的全局变量无法在函数作用域中正确访问。即使使用global关键字，在某些情况下仍可能失败。
+
+最终解决方案:
+采用"函数内部硬编码配置"的方法，完全避免依赖全局变量和include机制。
+
+修改内容:
+
+1. can_create_ruleset_room函数 (gamedata/ruleset/ruleset_config.php):
+   - 删除对全局变量$ruleset_config和$ruleset_enabled的依赖
+   - 在函数内部直接定义$local_ruleset_enabled = true
+   - 在函数内部直接定义$local_ruleset_config数组，包含所有RuleSet配置
+   - 使用本地变量进行所有权限检查逻辑
+
+2. get_ruleset_config函数 (gamedata/ruleset/ruleset_config.php):
+   - 同样采用函数内部硬编码配置的方法
+   - 确保与can_create_ruleset_room函数中的配置保持一致
+
+技术细节:
+
+硬编码的RuleSet配置:
+```php
+$local_ruleset_config = Array(
+    'ACBRA_2009' => Array(
+        'name' => 'ACBRA 2009版',
+        'description' => '重现2009年经典ACBRA版本的游戏体验，包含原版的平衡性设置、道具系统和NPC配置。',
+        'credits_cost' => 100,
+        'admin_free' => true,
+    ),
+    'ACDTS_2011' => Array(
+        'name' => 'ACDTS 2011版', 
+        'description' => '体验2011年ACDTS版本的独特魅力，包含当时的特色系统和平衡调整。',
+        'credits_cost' => 150,
+        'admin_free' => true,
+    ),
+    'ACDTS_298SP4' => Array(
+        'name' => 'ACDTS 298SP4版',
+        'description' => '最后的经典版本298SP4，包含了丰富的内容和完善的系统。',
+        'credits_cost' => 200,
+        'admin_free' => true,
+    ),
+);
+```
+
+优点:
+1. 完全避免变量作用域问题
+2. 不依赖include机制
+3. 函数调用更可靠
+4. 调试更容易
+
+缺点:
+1. 配置重复定义（在文件顶部和函数内部都有）
+2. 修改配置时需要同时修改多个地方
+3. 代码冗余
+
+关于模板编译问题:
+用户提醒gamedata/templates/下的.tpl.php文件是在游戏运行时动态生成的，不会出现在本地仓库中。
+如果遇到模板相关的错误，应该在templates/default/目录中的对应源文件中查找问题。
+
+当前模板文件templates/default/roomlist.htm中的RuleSet相关代码看起来是正确的，PHP警告可能是因为：
+1. 模板编译时变量类型信息丢失
+2. 在某些情况下$config变量被当作字符串而不是数组处理
+
+预期效果:
+修复后，权限检查应该能够正常工作：
+- can_create_ruleset_room函数应该返回true（对于groupid=9的管理员）
+- 调试文件应该显示local_ruleset_enabled=1, local_config_exists=yes
+- 用户应该能够成功创建RuleSet房间
+
+测试步骤:
+1. 尝试创建ACBRA_2009房间
+2. 检查新生成的调试文件
+3. 确认权限检查是否通过
+4. 验证房间是否成功创建
+
+如果仍有问题:
+可能需要进一步检查：
+1. 模板编译过程中的变量处理
+2. 房间创建流程中的其他环节
+3. 数据库操作是否正常

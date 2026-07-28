@@ -1,0 +1,228 @@
+修复耐久度为∞的消耗道具被错误消耗的问题
+时间：2025年1月19日
+
+## 问题描述
+玩家汇报使用了一件耐久度为∞（itms='∞'）的消耗道具时，该物品被直接消耗。
+耐久度∞的道具正确的处理是可以无限使用。
+
+## 问题分析
+通过对比item.func.old和新版本的item.main.php，发现在重构过程中，有几处地方直接使用了`$itms--`而没有检查`$nosta`（无限耐久度标识）。
+
+## 修复内容
+
+### 1. include/game/item.main.php
+**位置**：第218行
+**问题**：元素大师使用提示纸条时直接消耗道具
+**修复前**：
+```php
+$itms--;
+```
+**修复后**：
+```php
+if ($itms != $nosta) {
+    $itms--;
+}
+```
+
+### 2. include/game/item.tool.php
+**位置**：多处
+**问题**：多个工具类道具使用时直接消耗道具
+
+#### 2.1 探测器电池（第98行）
+**修复前**：
+```php
+$itms--;
+```
+**修复后**：
+```php
+if ($itms != $nosta) {
+    $itms--;
+}
+```
+
+#### 2.2 御神签（第111行）
+**修复前**：
+```php
+$itms--;
+```
+**修复后**：
+```php
+if ($itms != $nosta) {
+    $itms--;
+}
+```
+
+#### 2.3 凸眼鱼（第118行）
+**修复前**：
+```php
+$itms--; $isk = $cnum;
+```
+**修复后**：
+```php
+if ($itms != $nosta) {
+    $itms--;
+}
+$isk = $cnum;
+```
+
+#### 2.4 鱼眼凸（第127行）
+**修复前**：
+```php
+$itms--; $isk = $cnum;
+```
+**修复后**：
+```php
+if ($itms != $nosta) {
+    $itms--;
+}
+$isk = $cnum;
+```
+
+#### 2.5 天候棒（第139行）
+**修复前**：
+```php
+$itms--;
+```
+**修复后**：
+```php
+if ($itms != $nosta) {
+    $itms--;
+}
+```
+
+#### 2.6 消音器（第146行）
+**修复前**：
+```php
+$itms--;
+```
+**修复后**：
+```php
+if ($itms != $nosta) {
+    $itms--;
+}
+```
+
+### 3. include/game/item.giftbox.php
+**位置**：多处
+**问题**：礼品盒类道具使用时直接消耗道具
+
+#### 3.1 YGO box（第134行）
+**修复前**：
+```php
+$itms--; $oitm = $itm;
+```
+**修复后**：
+```php
+$oitm = $itm;
+if ($itms != $nosta) {
+    $itms--;
+}
+```
+
+#### 3.2 FY box（第161行）
+**修复前**：
+```php
+$itms--; $oitm = $itm;
+```
+**修复后**：
+```php
+$oitm = $itm;
+if ($itms != $nosta) {
+    $itms--;
+}
+```
+
+#### 3.3 Debug box（第188行）
+**修复前**：
+```php
+$itms--; $oitm = $itm;
+```
+**修复后**：
+```php
+$oitm = $itm;
+if ($itms != $nosta) {
+    $itms--;
+}
+```
+
+#### 3.4 Gift box（第20行）
+**修复前**：
+```php
+$itms--; $oitm = $itm; $oitmk = $itmk;
+```
+**修复后**：
+```php
+$oitm = $itm; $oitmk = $itmk;
+if ($itms != $nosta) {
+    $itms--;
+}
+```
+
+### 4. include/game/item.weather.php
+**位置**：第20行
+**问题**：天气控制道具使用时直接消耗道具
+
+**修复前**：
+```php
+$itms--;
+if ($itms <= 0) {
+    $log .= "<span class=\"red\">$itm</span>用光了。<br>";
+    $itm = $itmk = $itmsk = '';
+    $itme = $itms = 0;
+}
+```
+**修复后**：
+```php
+if ($itms != $nosta) {
+    $itms--;
+    if ($itms <= 0) {
+        $log .= "<span class=\"red\">$itm</span>用光了。<br>";
+        $itm = $itmk = $itmsk = '';
+        $itme = $itms = 0;
+    }
+}
+```
+
+### 5. include/game/item.other.php
+**位置**：第410行
+**问题**：🎆C类型道具（Weird Fireseed Box）使用时直接消耗道具
+
+**修复前**：
+```php
+$itms--; $oitm = $itm; $oitmk = $itmk;
+```
+**修复后**：
+```php
+$oitm = $itm; $oitmk = $itmk;
+if ($itms != $nosta) {
+    $itms--;
+}
+```
+
+## 修复原理
+在旧版本的item.func.old中，所有的物品消耗都正确地使用了以下模式：
+```php
+if ($itms != $nosta) {
+    $itms--;
+    if ($itms <= 0) {
+        $log .= "<span class=\"red\">$itm</span>用光了。<br>";
+        $itm = $itmk = $itmsk = '';
+        $itme = $itms = 0;
+    }
+}
+```
+
+其中`$nosta`是全局变量，表示无限耐久度的标识（通常为'∞'）。
+当物品的耐久度等于`$nosta`时，不应该减少耐久度，从而实现无限使用的效果。
+
+## 测试建议
+1. 创建一个耐久度为∞的消耗道具
+2. 使用该道具，确认道具不会被消耗
+3. 测试各种类型的道具：
+   - 元素大师的提示纸条
+   - 工具类道具（探测器电池、御神签等）
+   - 礼品盒类道具
+
+## 注意事项
+此修复确保了所有消耗道具在使用时都会正确检查耐久度是否为无限，
+保持了与旧版本item.func.old的一致性。

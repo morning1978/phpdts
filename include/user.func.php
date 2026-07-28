@@ -99,9 +99,34 @@ function real_ip()
 
 
 function get_iconlist(){
-	global $iconlimit,$icon;
+	global $iconlimit,$icon,$groomid,$db,$gtablepre;
+
+	// 检查当前房间是否使用RuleSet
+	$current_iconlimit = $iconlimit;
+	if (!empty($groomid) && $groomid > 0) {
+		$result = $db->query("SELECT gruleset FROM {$gtablepre}game WHERE groomid = {$groomid}");
+		if ($db->num_rows($result)) {
+			$room_data = $db->fetch_array($result);
+			$ruleset_id = $room_data['gruleset'];
+
+			if (!empty($ruleset_id)) {
+				include_once GAME_ROOT.'./gamedata/ruleset/ruleset_config.php';
+				$avatar_limits = get_ruleset_avatar_limits($ruleset_id);
+				if ($avatar_limits) {
+					// 根据用户性别确定头像限制
+					global $gender;
+					if ($gender == 'f') {
+						$current_iconlimit = $avatar_limits['female'] - 1; // 减1因为从0开始
+					} else {
+						$current_iconlimit = $avatar_limits['male'] - 1;
+					}
+				}
+			}
+		}
+	}
+
 	$iconarray = array();
-	for($n = 0; $n <= $iconlimit; $n++)	{
+	for($n = 0; $n <= $current_iconlimit; $n++)	{
 		if($icon == $n) {
 			$iconarray[] = '<OPTION value='.$n.' selected>'.$n.'</OPTION>';
 		} else {

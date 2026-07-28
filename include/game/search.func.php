@@ -7,9 +7,12 @@ if(!defined('IN_GAME')) {
 include_once GAME_ROOT.'./include/state.func.php';
 include_once GAME_ROOT.'./include/game/battle.func.php';
 include_once GAME_ROOT.'./include/game/itemmain.func.php';
+include_once GAME_ROOT.'./include/game/item.platform.php';
 include_once GAME_ROOT.'./include/game/revbattle.func.php';
 include_once GAME_ROOT.'./include/game/revbattle.calc.php';
 include_once GAME_ROOT.'./include/game/revcombat.func.php';
+include_once GAME_ROOT.'./include/game/revevent.func.php';
+include_once GAME_ROOT.'./include/game/quest.func.php';
 
 function check_can_move($pls,$pgroup,$moveto)
 {
@@ -37,7 +40,7 @@ function check_can_move($pls,$pgroup,$moveto)
 		{
 			$log .= '请选择正确的移动地点。<br>';
 			return 0;
-		} 
+		}
 		elseif(array_search($moveto,$arealist) <= $areanum && !$hack)
 		{
 			$log .= $plsinfo[$moveto].'是禁区，还是离远点吧！<br>';
@@ -47,7 +50,7 @@ function check_can_move($pls,$pgroup,$moveto)
 	return 1;
 }
 
-function move($moveto = 99,&$data=NULL) 
+function move($moveto = 99,&$data=NULL)
 {
 	global $log,$weather,$plsinfo,$hplsinfo,$arealist,$areanum,$hack,$areainfo,$gamestate,$gamecfg;
 	global $actlog;
@@ -84,13 +87,30 @@ function move($moveto = 99,&$data=NULL)
 		{
 			$log .= '请选择正确的移动地点。<br>';
 			return;
-		} 
+		}
 		elseif(array_search($moveto,$arealist) <= $areanum && !$hack)
 		{
 			$log .= $plsinfo[$moveto].'是禁区，还是离远点吧！<br>';
 			return;
 		}
 		$hpls_flag = false;
+	}
+
+	# RuleSet钩子：随机化移动落点
+	if(!$hpls_flag && function_exists('ruleset_should_randomize_move') && ruleset_should_randomize_move())
+	{
+		if(function_exists('ruleset_get_random_move_destination'))
+		{
+			$random_moveto = ruleset_get_random_move_destination($pls, $plsinfo, $arealist, $areanum, $hack);
+			if($random_moveto != $pls)
+			{
+				if($random_moveto != $moveto)
+				{
+					$log .= "<span class=\"cyan\">【全随机模式】你的移动目标被随机数改写了！</span><br>";
+				}
+				$moveto = $random_moveto;
+			}
+		}
 	}
 
 	# 计算并扣除移动所需SP/HP
@@ -101,22 +121,43 @@ function move($moveto = 99,&$data=NULL)
 	$moved = pre_move_search_events($data,'move');
 	if($hp <= 0) return;
 
-	if(!$moved) 
+	if(!$moved)
 	{
 		if(!$hpls_flag) $pgroup = 0;
 		$pls = $moveto;
 		$moveto_info = $hpls_flag ? $hplsinfo[$pgroup][$pls] : $plsinfo[$pls];
 		$log .= "{$actlog}，移动到了<span class=\"yellow\">{$moveto_info}</span>。<br>";
 	}
-	
-	$log .= $areainfo[$pls].'<br>';	
+
+	$log .= $areainfo[$pls].'<br>';
 
 	# 移动到指定地点，结算移动探索事件
 	move_search_events($data,'move');
 	if($hp <= 0) return;
 
+	# 更新charge值
+	process_charge_events($data);
+	platform_tick($data,'move');
+
+	// QUEST周期与分配 / QUEST tick and assignment
+	quest_tick($data);
+
+	# 如果是种火歌者，处理种火相关逻辑
+	if($club == 22) {
+		include_once GAME_ROOT.'./include/game/club22.func.php';
+		// 移动跟随状态的种火
+		FireseedFollow($pls);
+		// 处理探物和索敌逻辑
+		FireseedSearch($pls);
+		FireseedDrainNPC($pls);
+	}
+
 	$enemyrate =  \revbattle\calc_meetman_rate($data);
 	discover($enemyrate,$data);
+	quest_try_assign($data);
+	# RuleSet钩子：仅在普通移动完整执行成功后登记动作。
+	# RuleSet hook: record an ordinary move only after it completed successfully.
+	if(function_exists('ruleset_move_search_success_hook')) ruleset_move_search_success_hook($data,'move',!empty($moved));
 	return;
 }
 
@@ -136,7 +177,7 @@ function search(&$data=NULL)
 	{
 		$hpls_flag = true;
 	}
-	else 
+	else
 	{
 		if(array_search($pls,$arealist) <= $areanum && !$hack)
 		{
@@ -153,15 +194,32 @@ function search(&$data=NULL)
 	# 预移动、探索阶段事件结算
 	$moved = pre_move_search_events($data,'search');
 	if($hp <= 0) return;
-	
+
 	$log .= "{$actlog}，你搜索着周围的一切。。。<br>";
-	
+
 	# 探索指定地点，结算探索事件
 	move_search_events($data,'search');
 	if($hp <= 0) return;
-	
+
+	# 更新charge值
+	process_charge_events($data);
+	platform_tick($data,'search');
+
+	# 如果是种火歌者，处理种火相关逻辑
+	if($club == 22) {
+		include_once GAME_ROOT.'./include/game/club22.func.php';
+		FireseedSearch($pls);
+		FireseedDrainNPC($pls);
+	}
+
 	$enemyrate = \revbattle\calc_meetman_rate($data);
 	discover($enemyrate,$data);
+	// QUEST周期与分配 / QUEST tick and assignment
+	quest_tick($data);
+	quest_try_assign($data);
+	# RuleSet钩子：仅在原地探索完整执行成功后登记动作。
+	# RuleSet hook: record an in-place search only after it completed successfully.
+	if(function_exists('ruleset_move_search_success_hook')) ruleset_move_search_success_hook($data,'search',!empty($moved));
 	return;
 
 }
@@ -178,13 +236,27 @@ function calc_move_search_sp_cost(&$data,$act)
 	# 代偿移动&探索的消耗系数
 	$costspr = $movehp;
 
+	# 「飞行」技能判定：移动不消耗体力
+	if($act == 'move' && !empty($clbpara['skill']) && in_array('npc_flying', $clbpara['skill']))
+	{
+		$actlog = "你展开双翼，飞向了目的地";
+		return 'sp';
+	}
+
+	# 「解放」技能判定：探索时消耗的体力增加
+	if(!empty($clbpara['skill']) && in_array('npc_wrelease', $clbpara['skill']) && !empty($clbpara['skillpara']['npc_wrelease']['active']))
+	{
+		$level = isset($clbpara['skillpara']['npc_wrelease']['level']) ? $clbpara['skillpara']['npc_wrelease']['level'] : 2;
+		$costsp *= $level;
+	}
+
 	# 移动&探索要消耗的属性类型
 	$actpoint = $horizon == 1 ? 'hp' : 'sp';
 	# 代偿移动&探索要消耗的属性类型
 	$subpoint = $horizon == 1 ? 'sp' : 'hp';
 
 	# 受伤时消耗增加
-	if($inf) 
+	if($inf)
 	{
 		foreach($inf_move_sp as $inf_ky => $sp_down)
 		{
@@ -234,14 +306,14 @@ function pre_move_search_events(&$data,$act)
 
 	# 天气事件
 	# 龙卷风
-	if($weather == 11) 
+	if($weather == 11)
 	{
 		if($hpls_flag)
 		{
 			$pls = array_rand($hplsinfo[$pgroup]);
 			$moveto_info = $hplsinfo[$pgroup][$pls];
 		}
-		else 
+		else
 		{
 			$safepls = get_safe_plslist(0);
 			$pls = $safepls[array_rand($safepls)];
@@ -251,17 +323,21 @@ function pre_move_search_events(&$data,$act)
 		$moved = true;
 	}
 	# 冰雹
-	elseif($weather == 13) 
+	elseif($weather == 13)
 	{
 		$damage = round($mhp/12) + rand(0,20);
+		if(function_exists('ruleset_damage_immunity_hook')) {
+			$ruleset_damage = ruleset_damage_immunity_hook($data, 'weather_hail', $damage);
+			if($ruleset_damage !== NULL) $damage = max(0, intval($ruleset_damage));
+		}
 		$hp -= $damage;
 		$log .= "被<span class=\"blue\">冰雹</span>击中，生命减少了<span class=\"red\">$damage</span>点！<br>";
-		if($hp <= 0 ) 
+		if($hp <= 0 )
 		{
 			death('hsmove','',0,'',$data);
 			return $moved;
 		}
-	} 
+	}
 	# 离子暴
 	elseif($weather == 14)
 	{
@@ -290,7 +366,7 @@ function pre_move_search_events(&$data,$act)
 		}else{
 			$log .= "空气中充斥着狂暴的电磁波……<br>";
 		}
-	} 
+	}
 	//辐射尘
 	elseif($weather == 15)
 	{
@@ -309,7 +385,7 @@ function pre_move_search_events(&$data,$act)
 		}else{
 			$log .= "空气中弥漫着放射性尘埃……<br>";
 		}
-	} 
+	}
 	//臭氧洞
 	elseif($weather == 16)
 	{
@@ -327,7 +403,7 @@ function pre_move_search_events(&$data,$act)
 		}else{
 			$log .= "高强度的紫外线灼烧着大地……<br>";
 		}
-	} 
+	}
 
 	# 「霉运」效果：移动/探索时有概率迷路到其他地图
 	if(!$moved && !check_skill_unlock('inf_cursed',$data))
@@ -342,7 +418,7 @@ function pre_move_search_events(&$data,$act)
 				$pls = array_rand($hplsinfo[$pgroup]);
 				$moveto_info = $hplsinfo[$pgroup][$pls];
 			}
-			else 
+			else
 			{
 				$safepls = get_safe_plslist(0);
 				$pls = $safepls[array_rand($safepls)];
@@ -368,7 +444,7 @@ function move_search_events(&$data,$act)
 		$data = &$pdata;
 	}
 	extract($data,EXTR_REFS);
-	
+
 	if($act == 'move')
 	{
 		//移动后丢失探索视野
@@ -388,6 +464,10 @@ function move_search_events(&$data,$act)
 					$damage = min($mhp-$hp,ceil($damage*($sk_p/100)));
 					$damage *= -1;
 				}
+				if($damage > 0 && function_exists('ruleset_damage_immunity_hook')) {
+					$ruleset_damage = ruleset_damage_immunity_hook($data, 'status_'.$inf_ky, $damage);
+					if($ruleset_damage !== NULL) $damage = max(0, intval($ruleset_damage));
+				}
 				$hp -= $damage;
 				if($damage > 0) $log .= "{$infwords[$inf_ky]}减少了<span class=\"red\">$damage</span>点生命！<br>";
 				elseif($damage < 0) $log .= "{$infwords[$inf_ky]}恢复了<span class=\"lime\">".abs($damage)."</span>点生命！<br>";
@@ -395,10 +475,10 @@ function move_search_events(&$data,$act)
 					death($inf_ky.'move','',0,'',$data);
 					return;
 				}
-			}			
+			}
 		}
 	}
-	
+
 	# club21的移动烧血放在这里，对吗？
 	if((!check_skill_unlock('c21_stormedge',$data)) && (get_skillpara('c21_discovery','count',$data['clbpara']) < 7)) {
 		$burn_rate = get_skillvars('c21_stormedge','burn_rate');
@@ -440,14 +520,14 @@ function move_search_events(&$data,$act)
 			if(!empty($clbpara['event_bgmbook'])) unset($clbpara['event_bgmbook']);
 		}
 		# 雨势
-		else 
+		else
 		{
 			if(empty($clbpara['event_bgmbook'])) $clbpara['event_bgmbook'] = Array('wth18');
 			$wthlastime = $now - $gamevars['wth18stime'];
 			# 雨势在前7分钟递增，后3分钟递减
 			$wthlastime = $wthlastime <= 420 ? $wthlastime : 600 - $wthlastime;
 			$wthpow = min(7,max(1,round($wthlastime / 60)));
-			$hp_up = diceroll($wthpow) * diceroll($wthpow); 
+			$hp_up = diceroll($wthpow) * diceroll($wthpow);
 			$sp_up = diceroll($wthpow) * diceroll($wthpow);
 			if($hp_up || $sp_up)
 			{
@@ -488,7 +568,7 @@ function move_search_events(&$data,$act)
 	if(!empty(get_skillpara('c11_merc','id',$clbpara)))
 	{
 		include_once GAME_ROOT.'./include/game/revclubskills_extra.func.php';
-		$sk = 'c11_merc'; 
+		$sk = 'c11_merc';
 		# 检查是否有需要付工资的佣兵
 		$mids = get_skillpara($sk,'id',$clbpara);
 		foreach($mids as $mkey => $mid)
@@ -547,7 +627,7 @@ function move_search_events(&$data,$act)
 	return;
 }
 
-function discover($schmode = 0,&$data=NULL) 
+function discover($schmode = 0,&$data=NULL)
 {
 	//global $pdata;
 	//global $art,$pls,$now,$log,$mode,$command,$cmd,$event_obbs,$weather,$pls,$club,$pose,$tactic,$inf,$item_obbs,$enemy_obbs,$trap_min_obbs,$trap_max_obbs,$bid,$db,$tablepre,$gamestate,$corpseprotect,$action,$skills,$rp,$aidata;
@@ -571,10 +651,10 @@ function discover($schmode = 0,&$data=NULL)
 	}
 	else
 	{
-		if(isset($clbpara['pls_bgmbook'])) 
+		if(isset($clbpara['pls_bgmbook']))
 			unset($clbpara['pls_bgmbook']);
 	}
-	
+
 	include_once GAME_ROOT. './include/game/aievent.func.php';//AI事件
 	$aidata = false;//用于判断天然呆AI（冴冴这样的）是否已经来到你身后并且很生气
 	aievent(20);//触发AI事件的概率
@@ -590,7 +670,15 @@ function discover($schmode = 0,&$data=NULL)
 	if(($event_dice < $event_obbs)||(($art!="Untainted Glory")&&($pls==34)&&($gamestate != 50))){
 		//echo "进入事件判定<br>";
 		include_once GAME_ROOT.'./include/game/event.func.php';
+		$event_hp_before = $hp;
 		$event_flag = event();
+		$event_damage = max(0, intval($event_hp_before) - intval($hp));
+		if($event_damage > 0 && function_exists('ruleset_damage_immunity_hook')) {
+			$ruleset_damage = ruleset_damage_immunity_hook($data, 'event', $event_damage);
+			if($ruleset_damage !== NULL) {
+				$hp = max(0, min(intval($mhp), intval($event_hp_before) - max(0, intval($ruleset_damage))));
+			}
+		}
 		//触发了事件，中止探索推进
 		if($event_flag)
 		{
@@ -598,15 +686,15 @@ function discover($schmode = 0,&$data=NULL)
 			return;
 		}
 	}
-	
+
 	$trap_dice=diceroll(99);
 	// 计算陷阱“发现率”
 	if($trap_dice < $trap_max_obbs)
-	{ 
+	{
 		//echo "进入踩陷阱判定<br>";
 		$trapresult = $db->query("SELECT * FROM {$tablepre}maptrap WHERE pls = '$pls' ORDER BY itmk DESC");
 		$trpnum = $db->num_rows($trapresult);
-		//看地图上有没有陷阱	
+		//看地图上有没有陷阱
 		if($trpnum)
 		{
 			$fstrp = $db->fetch_array($trapresult);
@@ -638,7 +726,7 @@ function discover($schmode = 0,&$data=NULL)
 		}
 	}
 	$mode_dice = rand(0,99);
-	if($mode_dice < $schmode) 
+	if($mode_dice < $schmode)
 	{
 		global $fog,$gamestate;
 
@@ -653,7 +741,7 @@ function discover($schmode = 0,&$data=NULL)
 		$enemynum = $db->num_rows($result);
 		$enemyarray = range(0, $enemynum - 1);
 		shuffle($enemyarray);
-		
+
 		//移除了重复调用discover()的设定，尝试用一种正常一点的办法确保敌人/尸体发现率符合基础设定值，不然现在的尸体确实太难摸了。
 		//现在触发遇敌事件只会返回三种结果：1、发现尸体；2、发现敌人、3、敌人隐藏起来；所以实际的尸体发现率=$enemyrate*$corpse_obbs
 		$meetman_flag = 0;
@@ -671,14 +759,18 @@ function discover($schmode = 0,&$data=NULL)
 			{
 				if($edata['hp'] <= 0)
 				{
+					# RuleSet额外战利品需要先于连斗尸体过滤判定。
+					# RuleSet extra loot must be checked before combo-stage corpse filtering.
+					$ruleset_extra_loot = function_exists('ruleset_corpse_has_extra_loot')
+						&& ruleset_corpse_has_extra_loot($edata,$data);
 					//直接略过无效尸体
-					if($gamestate>=40) continue;
-					$ret = false;
+					if($gamestate>=40 && !$ruleset_extra_loot) continue;
+					$ret = $ruleset_extra_loot ? true : false;
 					# 略过无效尸体的条件是……全身装备/道具存在耐久不为0的部分
 					# 但是空手和内衣又属于特例……这两个部位就只能判断效果不为0了
 					foreach(array('wepe','wep2e','money','arhs','arbe','aras','arfs','arts','itms1','itms2','itms3','itms4','itms5','itms6') as $chkval)
 					{
-						if($edata[$chkval]) 
+						if($edata[$chkval])
 						{
 							$ret = true;
 							break;
@@ -695,7 +787,7 @@ function discover($schmode = 0,&$data=NULL)
 						break;
 					}
 				}
-				else 
+				else
 				{
 					# 略过决斗者
 					if ((!$edata['type'])&&($artk=='XX')&&(($edata['artk']!='XX')||($edata['art']!=$name))&&($gamestate<50)) continue;
@@ -703,9 +795,23 @@ function discover($schmode = 0,&$data=NULL)
 					# 暂时直接略过盟友单位
 					if(!empty($edata['clbpara']['mate']) && in_array($pid,$edata['clbpara']['mate'])) continue;
 
+					# 枫火歌者遇到自己配下的种火时的特殊处理
+					if($club == 22 && $edata['type'] == 92) {
+						// 确保 NPC 的 clbpara 是数组格式
+						if(!is_array($edata['clbpara'])) {
+							$edata['clbpara'] = get_clbpara($edata['clbpara']);
+						}
+						// 检查是否为自己配下的种火
+						if(!empty($edata['clbpara']['owner']) && $edata['clbpara']['owner'] == $pid) {
+							$log .= "<span class='yellow'>你遇到了自己配下的种火「{$edata['name']}」。</span><br>";
+							$log .= "<span class='lime'>「{$edata['name']}」友好地看着你，你们没有发生冲突。</span><br>";
+							continue; // 跳过战斗，继续寻找其他敌人
+						}
+					}
+
 					# 「量心」技能效果判定（不会遭遇HP为1的敌人）：
 					if(!check_skill_unlock('c19_dispel',$data) && !empty(get_skillpara('c19_dispel','active',$clbpara)) && $edata['hp'] == 1) continue;
-					
+
 					# 计算活人发现率
 					$hide_r = \revbattle\calc_hide_rate($data,$edata);
 					$enemy_dice = diceroll(99);
@@ -717,7 +823,7 @@ function discover($schmode = 0,&$data=NULL)
 		}
 		if($meetman_flag>0)
 		{
-			if($edata['hp'] > 0) 
+			if($edata['hp'] > 0)
 			{
 				//if(isset($edata['clbpara'])) $edata['clbpara']=get_clbpara($edata['clbpara']);
 				//发现队友
@@ -727,7 +833,7 @@ function discover($schmode = 0,&$data=NULL)
 					$action = 'team';
 					findteam($edata);
 					return;
-				} 
+				}
 				//发现中立NPC或友军 TODO：把这里条件判断挪到一个函数里
 				elseif(isset($edata['clbpara']['post']) && $edata['clbpara']['post'] == $pid)
 				{
@@ -737,23 +843,25 @@ function discover($schmode = 0,&$data=NULL)
 					return;
 				}
 				//发现敌人
-				else 
+				else
 				{
 					battle_flag:
 					//计算玩家对敌人的先攻概率
 					$active_r = \revbattle\calc_active_rate($data,$edata);
 					$bid = $edata['pid'];
-					$active_dice = diceroll(99);
+					$force_player_initiative = function_exists('ruleset_force_player_initiative_hook')
+						? ruleset_force_player_initiative_hook($edata,$data) : NULL;
+					$active_dice = $force_player_initiative ? -1 : diceroll(99);
 					//先制
 					if($active_dice < $active_r)
 					{
 						$action = 'enemy'; $bid = $edata['pid'];
 						if($data['pass'] != 'bot')
 						{
-							
+
 							\revbattle\findenemy_rev($edata);
 						}
-						else 
+						else
 						{
 							echo "进入战斗！<br>";
 							\revcombat\rev_combat_prepare($data,$edata,1,'',0);
@@ -761,14 +869,14 @@ function discover($schmode = 0,&$data=NULL)
 						return;
 					}
 					//挨打
-					else 
+					else
 					{
 						if($data['pass'] != 'bot')
 						{
-							
+
 							\revcombat\rev_combat_prepare($edata,$data,0);
 						}
-						else 
+						else
 						{
 							\revcombat\rev_combat_prepare($edata,$data,0,'',0);
 						}
@@ -776,7 +884,7 @@ function discover($schmode = 0,&$data=NULL)
 					}
 				}
 			}
-			else 
+			else
 			{
 				$action = 'corpse'; $bid = $edata['pid'];
 				findcorpse($edata);
@@ -787,21 +895,21 @@ function discover($schmode = 0,&$data=NULL)
 		{
 			$log .= '似乎有人隐藏着……<br>';
 		}
-		else 
+		else
 		{
 			if($horizon == 1) $log .= '<span class="yellow">周围没有同处于灵子视界中的对象。</span><br>';
 			else $log .= '<span class="yellow">周围一个人都没有。</span><br>';
 		}
 		$mode = 'command';
 		return;
-	} 
-	else 
+	}
+	else
 	{
 		//echo "进入道具判定<br>";
 		//$find_r = get_find_r($weather,$pls,$pose,$tactic,$club,$inf);
 		$find_obbs = $item_obbs;
 		$item_dice = rand(0,99);
-		if($item_dice < $find_obbs) 
+		if($item_dice < $find_obbs)
 		{
 			$flag = focus_item($data);
 			if(!$flag)
@@ -810,8 +918,8 @@ function discover($schmode = 0,&$data=NULL)
 				$mode = 'command';
 				return;
 			}
-		} 
-		else 
+		}
+		else
 		{
 			$log .= "但是什么都没有发现。<br>";
 		}
@@ -834,7 +942,7 @@ function focus_item(&$data=NULL,$id=NULL)
 	if(isset($id))
 	{
 		$result = $db->query("SELECT * FROM {$tablepre}mapitem WHERE pls = '$pls' AND iid = '$id'");
-		if(!$db->num_rows($result)) 
+		if(!$db->num_rows($result))
 		{
 			// 这是特性
 			$log .= "但是你想找的东西已经不见了！<br>";
@@ -842,7 +950,7 @@ function focus_item(&$data=NULL,$id=NULL)
 		}
 		$mi=$db->fetch_array($result);
 	}
-	else 
+	else
 	{
 		$result = $db->query("SELECT * FROM {$tablepre}mapitem WHERE pls = '$pls'");
 		$itemnum = $db->num_rows($result);
@@ -861,17 +969,17 @@ function focus_item(&$data=NULL,$id=NULL)
 	$db->query("DELETE FROM {$tablepre}mapitem WHERE iid='$iid'");
 	if($itms0)
 	{
-		if($data['pass'] == 'bot') 
+		if($data['pass'] == 'bot')
 		{
 			itemget($data);
 		}
-		else 
+		else
 		{
 			itemfind();
 			return 1;
 		}
-	} 
-	else 
+	}
+	else
 	{
 		$log .= "但是什么都没有发现。可能是因为道具有天然呆属性。<br>";
 	}

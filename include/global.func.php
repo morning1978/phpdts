@@ -58,7 +58,7 @@ function gstrfilter($str) {
 		foreach($str as $key => $val) {
 			$str[$key] = gstrfilter($val);
 		}
-	} else {		
+	} else {
 		if($GLOBALS['magic_quotes_gpc']) {
 			$str = stripslashes($str);
 		}
@@ -70,13 +70,17 @@ function gstrfilter($str) {
 }
 
 function language($file, $templateid = 0, $tpldir = '') {
-	$tpldir = $tpldir ? $tpldir : TPLDIR;
-	$templateid = $templateid ? $templateid : TEMPLATEID;
+	global $TEMPLATEID_OVERRIDE, $TPLDIR_OVERRIDE;
+
+	// 使用覆盖变量（如果存在）
+	$tpldir = $tpldir ? $tpldir : (isset($TPLDIR_OVERRIDE) && $TPLDIR_OVERRIDE ? $TPLDIR_OVERRIDE : TPLDIR);
+	$templateid = $templateid ? $templateid : (isset($TEMPLATEID_OVERRIDE) && $TEMPLATEID_OVERRIDE ? $TEMPLATEID_OVERRIDE : TEMPLATEID);
 
 	$languagepack = GAME_ROOT.'./'.$tpldir.'/'.$file.'.lang.php';
 	if(file_exists($languagepack)) {
 		return $languagepack;
-	} elseif($templateid != 1 && $tpldir != './templates/default') {
+	} elseif($tpldir != './templates/default') {
+		// Fallback到默认模板的语言包
 		return language($file, 1, './templates/default');
 	} else {
 		return FALSE;
@@ -84,16 +88,26 @@ function language($file, $templateid = 0, $tpldir = '') {
 }
 
 function template($file, $templateid = 0, $tpldir = '') {
-	global $tplrefresh;
+	global $tplrefresh, $TEMPLATEID_OVERRIDE, $TPLDIR_OVERRIDE;
 
-	$tpldir = $tpldir ? $tpldir : TPLDIR;
-	$templateid = $templateid ? $templateid : TEMPLATEID;
+	// 使用覆盖变量（如果存在）
+	$tpldir = $tpldir ? $tpldir : (isset($TPLDIR_OVERRIDE) && $TPLDIR_OVERRIDE ? $TPLDIR_OVERRIDE : TPLDIR);
+	$templateid = $templateid ? $templateid : (isset($TEMPLATEID_OVERRIDE) && $TEMPLATEID_OVERRIDE ? $TEMPLATEID_OVERRIDE : TEMPLATEID);
 
 	$tplfile = GAME_ROOT.'./'.$tpldir.'/'.$file.'.htm';
 	$objfile = GAME_ROOT.'./gamedata/templates/'.$templateid.'_'.$file.'.tpl.php';
-	if(TEMPLATEID != 1 && $templateid != 1 && !file_exists($tplfile)) {
-		return template($file, 1, './templates/default/');
+
+	// 改进的fallback机制，支持nouveau模板
+	if(!file_exists($tplfile)) {
+		// 如果当前模板文件不存在，尝试fallback到默认模板
+		if($tpldir != './templates/default') {
+			return template($file, 1, './templates/default');
+		} else {
+			// 如果默认模板也不存在，返回错误
+			gexit("Template file '$file.htm' not found in any template directory!");
+		}
 	}
+
 	if($tplrefresh == 1) {
 		if(!file_exists($objfile) || filemtime($tplfile) > filemtime($objfile)) {
 			require_once GAME_ROOT.'./include/template.func.php';
@@ -128,6 +142,33 @@ function clearcookies() {
 }
 
 function config($file = '', $cfg = 1) {
+	global $groomid, $db, $gtablepre;
+
+	// 检查当前房间是否使用RuleSet
+	$ruleset_id = '';
+	if (isset($groomid) && isset($db) && isset($gtablepre)) {
+		$room_id = intval($groomid);
+		$result = $db->query("SELECT gruleset FROM {$gtablepre}game WHERE groomid = {$room_id}");
+		if ($db->num_rows($result)) {
+			$room_data = $db->fetch_array($result);
+			$ruleset_id = $room_data['gruleset'];
+		}
+	}
+
+	// 如果房间使用RuleSet，优先加载RuleSet资源文件
+	if (!empty($ruleset_id)) {
+		$ruleset_file = GAME_ROOT."./gamedata/ruleset/{$ruleset_id}/cache/{$file}_{$cfg}.php";
+		if (file_exists($ruleset_file)) {
+			return $ruleset_file;
+		}
+		// 如果RuleSet文件不存在，fallback到默认文件
+		$ruleset_file = GAME_ROOT."./gamedata/ruleset/{$ruleset_id}/cache/{$file}_1.php";
+		if (file_exists($ruleset_file)) {
+			return $ruleset_file;
+		}
+	}
+
+	// 默认加载逻辑
 	$cfgfile = file_exists(GAME_ROOT."./gamedata/cache/{$file}_{$cfg}.php") ? GAME_ROOT."./gamedata/cache/{$file}_{$cfg}.php" : GAME_ROOT."./gamedata/cache/{$file}_1.php";
 	return $cfgfile;
 }
@@ -173,12 +214,12 @@ function writeover($filename,$data,$method="rb+",$iflock=1,$check=1,$chmod=1){
 		if(flock($handle,LOCK_EX)){
 			fwrite($handle,$data);
 			if($method=="rb+") ftruncate($handle,strlen($data));
-			fclose($handle); 
+			fclose($handle);
 		} else {var_dump($filename);exit ('Write file error.');}
 	} else {
 		fwrite($handle,$data);
 		if($method=="rb+") ftruncate($handle,strlen($data));
-		fclose($handle); 
+		fclose($handle);
 	}
 	$chmod && chmod($filename,0777);
 	return;
@@ -201,9 +242,14 @@ function compatible_json_encode($data){	//自动选择使用内置函数或者�
 		$json = new Services_JSON();
 		$jdata = $json->encode($data);
 	} else{
-		$jdata = json_encode($data);
+		// 使用 JSON_UNESCAPED_UNICODE 标志以正确处理中文字符
+		if(version_compare(PHP_VERSION, '5.4.0', '>=')) {
+			$jdata = json_encode($data, JSON_UNESCAPED_UNICODE);
+		} else {
+			$jdata = json_encode($data);
+		}
 	}
-	return $jdata;	
+	return $jdata;
 }
 
 //----------------------------------------
@@ -242,7 +288,7 @@ function logsave($pid,$time,$log = '',$type = 's'){
 	$ldata['log']=$log;
 	//$db->query("INSERT INTO {$tablepre}log (toid,type,`time`,log) VALUES ('$pid','$type','$time','$log')");
 	$db->array_insert("{$tablepre}log", $ldata);
-	return;	
+	return;
 }
 
 function load_gameinfo() {
@@ -260,12 +306,12 @@ function load_gameinfo() {
 	return Array($gamestate,$gamevars);
 }
 
-function save_gameinfo() 
+function save_gameinfo()
 {
 	global $now,$db,$gtablepre,$tablepre;
 	global $groomid,$gamenum,$gamestate,$lastupdate,$starttime,$winmode,$winner,$arealist,$areanum,$areatime,$areawarn,$validnum,$alivenum,$deathnum,$afktime,$optime,$weather,$hack,$combonum,$gamevars;
 	if(!isset($gamenum)||!isset($gamestate)){return;}
-	
+
 	if($gamestate > 10)
 	{
 		$result = $db->query("SELECT pid FROM {$tablepre}players WHERE type=0");
@@ -274,19 +320,26 @@ function save_gameinfo()
 		$alivenum = $db->num_rows($result);
 		$result = $db->query("SELECT pid FROM {$tablepre}players WHERE hp<=0 OR state>=10");
 		$deathnum = $db->num_rows($result);
+		// RuleSet钩子：修正规则集专属单位是否计入全局死亡数。
+		// RuleSet hook: adjust whether mode-specific units count toward the global death total.
+		if(function_exists('ruleset_adjust_deathnum_hook'))
+		{
+			$ruleset_deathnum = ruleset_adjust_deathnum_hook($deathnum);
+			if($ruleset_deathnum !== NULL) $deathnum = max(0,intval($ruleset_deathnum));
+		}
 	}
-	else 
+	else
 	{
 		$validnum = $alivenum = $deathnum = 0;
 	}
-	
+
 	if(empty($afktime)){$afktime = $now;}
 	if(empty($optime)){$optime = $now;}
 	$gameinfo = Array();
 	$gameinfo['gamenum'] = $gamenum;
 	$gameinfo['gamestate'] = $gamestate;
 	//$gameinfo['lastupdate'] = $now;//注意此处
-	$gameinfo['starttime'] = $starttime;	
+	$gameinfo['starttime'] = $starttime;
 	$gameinfo['winmode'] = $winmode;
 	$gameinfo['winner'] = $winner;
 	$gameinfo['arealist'] = implode(',',$arealist);
@@ -344,7 +397,7 @@ function getchat($last,$team='',$limit=0) {
 	//登记非功能性地点信息时合并隐藏地点
 	$tplsinfo = $plsinfo;
 	foreach($hplsinfo as $hgroup=>$hpls) $tplsinfo += $hpls;
-	
+
 	while($chat = $db->fetch_array($result)) {
 		//if(!$chatdata['lastcid']){$chatdata['lastcid'] = $chat['cid'];}
 		if($chatdata['lastcid'] < $chat['cid']){$chatdata['lastcid'] = $chat['cid'];}
@@ -409,7 +462,7 @@ function storyputchat($time,$type){
 	$chat = $syschatinfo[$type];
 	$list = Array('r' => 0, 'b' => 0, 'l' => 0, 'k'=> 0);
 	if($rdown){$list['r'] = 1;}
-	if($bdown){$list['b'] = 1;}	
+	if($bdown){$list['b'] = 1;}
 	if($ldown){$list['l'] = 1;}
 	if($kdown){$list['k'] = 1;}
 	foreach($chat as $val){
@@ -431,7 +484,7 @@ function storyputchat($time,$type){
 		$send = $msgs[1];
 		$msg = $msgs[2];
 		$db->query("INSERT INTO {$tablepre}chat (type,`time`,send,msg) VALUES ('2','$time','$send','$msg')");
-	}		
+	}
 	return;
 }
 
@@ -481,14 +534,14 @@ function update_db_player_structure($type=0)
 {
 	global $db,$gtablepre,$tablepre,$checkstr;
 	$db_player_structure = $db_player_structure_types = $tpldata = Array();
-	
+
 	$dps_need_update = 0;//判定是否需要更新玩家字段
 	$dps_file = GAME_ROOT.'./gamedata/bak/db_player_structure.config.php';
 	$sql_file = GAME_ROOT.'./gamedata/sql/players.sql';
 	if(!file_exists($dps_file) || filemtime($sql_file) > filemtime($dps_file)){
 		$dps_need_update = 1;
 	}
-	
+
 	if($dps_need_update){//如果要更新，直接新建一个表，不需要依赖已有的players表
 		$sql = file_get_contents($sql_file);
 		$sql = str_replace("\r", "\n", str_replace(' bra_', ' '.$gtablepre.'tmp_', $sql));
@@ -496,7 +549,7 @@ function update_db_player_structure($type=0)
 		$result = $db->query("DESCRIBE {$gtablepre}tmp_players");
 		while ($sttdata = $db->fetch_array($result))
 		{
-			global ${$sttdata['Field']}; 
+			global ${$sttdata['Field']};
 			$db_player_structure[] = $sttdata['Field'];
 			$db_player_structure_types[$sttdata['Field']] = $sttdata['Type'];
 			//array_push($db_player_structure,$pdata['Field']);
@@ -505,7 +558,7 @@ function update_db_player_structure($type=0)
 		$dps_cont .= '$db_player_structure = ' . var_export($db_player_structure,1).";\r\n".'$db_player_structure_types = ' . var_export($db_player_structure_types,1).";\r\n?>";
 		writeover($dps_file, $dps_cont);
 		chmod($dps_file,0777);
-		
+
 	}else{//若不需要更新，则直接读文件就好
 		include $dps_file ;
 	}
@@ -526,9 +579,9 @@ function player_format_with_db_structure($data){
 }
 
 # 处理道具名的显示信息
-function parse_nameinfo_desc($info,$subinfo='',$short='',$tiptype='')
+function parse_nameinfo_desc($info, $subinfo='', $short='', $tiptype='', $itmpara='', $itmk='')
 {
-	global $tps_name,$tps_names,$tps_name_lore,$noitm;
+	global $tps_name, $tps_names, $tps_name_lore, $noitm;
 	global $horizon;
 
 	if(empty($info)) return $noitm;
@@ -542,7 +595,7 @@ function parse_nameinfo_desc($info,$subinfo='',$short='',$tiptype='')
 	{
 		$tinfo = preg_replace('/锋利的|电气|毒性|\[\+.*\]|-改/', '', $info);
 	}
-	else 
+	else
 	{
 		$tinfo = $info;
 	}
@@ -566,8 +619,35 @@ function parse_nameinfo_desc($info,$subinfo='',$short='',$tiptype='')
 		$info_tp .= $tps_name_lore[$tinfo]['title'];
 	}
 
+	# 处理 itmpara 字段的 tooltip
+	if(!empty($itmpara))
+	{
+		// 引入 itmpara_tooltip 函数
+		if(!function_exists('parse_itmpara_tooltip'))
+		{
+			include_once GAME_ROOT.'./include/game/itmpara_tooltip.func.php';
+			include_once GAME_ROOT.'./gamedata/cache/itmpara_tooltip.php';
+		}
+
+		// 解析 itmpara tooltip
+		$tooltip_content = parse_itmpara_tooltip($itmpara, $itmk);
+
+		// 如果有 itmpara tooltip，添加到现有 tooltip
+		if(!empty($tooltip_content))
+		{
+			if(!empty($info_tp)) $info_tp .= "\r";
+			$info_tp .= $tooltip_content;
+		}
+	}
+
 	if(!empty($info_f)) $info_f = "class=\"{$info_f}\"";
-	if(!empty($info_tp)) $info_tp = "{$ttypes}=\"{$info_tp}\"";
+
+	// 对 tooltip 内容进行 HTML 转义
+	if(!empty($info_tp)) {
+		// 使用 htmlspecialchars 进行 HTML 转义
+		$escaped_tp = htmlspecialchars($info_tp, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+		$info_tp = "{$ttypes}=\"{$escaped_tp}\"";
+	}
 
 	$info = "<span {$info_f} {$info_tp}>{$info}</span>";
 	return $info;
@@ -586,7 +666,7 @@ function parse_kinfo_desc($info,$subinfo='',$short='',$tiptype='')
 	# 如果该道具类别没有特殊介绍，则直接使用通用类别
 	foreach($iteminfo as $info_key => $info_value)
 	{
-		if(strpos($info,$info_key)===0) 
+		if(strpos($info,$info_key)===0)
 		{
 			$v_info = $info_key;
 			break;
@@ -605,7 +685,7 @@ function parse_kinfo_desc($info,$subinfo='',$short='',$tiptype='')
 	elseif(!empty($subinfo))
 	{
 		if(!empty($info_tp)) $info_tp .= "\r";
-		if(!is_array($subinfo)) $subinfo = get_itmsk_array($subinfo); 
+		if(!is_array($subinfo)) $subinfo = get_itmsk_array($subinfo);
 		if($info == 'WG' || $info == 'WGK' || $info == 'WDG')
 		{
 			if(in_array('e',$subinfo) || in_array('w',$subinfo)) $info_tp.= "需装填「能源弹药」";
@@ -617,7 +697,7 @@ function parse_kinfo_desc($info,$subinfo='',$short='',$tiptype='')
 	{
 		if($info == 'WG' || $info == 'WGK' || $info == 'WDG') $info_tp.= "需装填「手枪弹药」";
 	}
-	
+
 	if(!empty($info_f)) $info_f = "class=\"{$info_f}\"";
 	if(!empty($info_tp)) $info_tp = "{$ttypes}=\"{$info_tp}\"";
 
@@ -655,9 +735,9 @@ function parse_skinfo_desc($info,$subinfo='',$short='',$tiptype='')
 	else
 	{
 		# 数组化
-		if(!is_array($info)) $info = get_itmsk_array($info); 
+		if(!is_array($info)) $info = get_itmsk_array($info);
 		# 计数
-		$sk_max = count($info); $sk_nums = 0; 
+		$sk_max = count($info); $sk_nums = 0;
 		$sk_info = ''; $sk_tp = '';
 		# 属性中是否有奇迹属性？
 		if(in_array('x',$info)) $xflag = 1;
@@ -669,10 +749,10 @@ function parse_skinfo_desc($info,$subinfo='',$short='',$tiptype='')
 			# 如果不是第一个属性 显示一个 + 号
 			if($sk_nums>0) $sk_info .= '+';
 			# 检查属性有没有特殊样式
-			if(isset($tps_isk[$sk]['class'])) $csk = "<span class=\"".$tps_isk[$sk]['class']."\">".$csk."</span>"; 
+			if(isset($tps_isk[$sk]['class'])) $csk = "<span class=\"".$tps_isk[$sk]['class']."\">".$csk."</span>";
 			# 将属性加入显示队列
 			$sk_info .= $csk;
-			
+
 			# 检查属性有没有tooltip
 			if(isset($tps_isk[$sk]['title']))
 			{
@@ -685,7 +765,7 @@ function parse_skinfo_desc($info,$subinfo='',$short='',$tiptype='')
 					# 换行
 					if($sk_nums<$sk_max-1) $sk_tp .= "\r";
 				}
-				else 
+				else
 				{
 					$sk_tp = !empty($xflag) && isset($tps_isk[$sk]['x-title']) ? $tps_isk[$sk]['x-title'] : $tps_isk[$sk]['title'];
 				}
@@ -694,7 +774,7 @@ function parse_skinfo_desc($info,$subinfo='',$short='',$tiptype='')
 		}
 		if(!empty($sk_info)) $ret = $sk_info;
 		if($sk_max > $short_nums && $short) $ret = $itemspkinfo[$info[0]]."+...+".$itemspkinfo[end($info)];
-		if(!empty($sk_tp)) 
+		if(!empty($sk_tp))
 		{
 			$ret = "<span {$ttypes}=\"{$sk_tp}\">{$ret}</span>";
 		}
@@ -733,7 +813,7 @@ function parse_info_desc($info,$type,$vars='',$short=0,$tiptype=0)
 	{
 		foreach($iteminfo as $info_key => $info_value)
 		{
-			if(strpos($info,$info_key)===0) 
+			if(strpos($info,$info_key)===0)
 			{
 				$v_info = $info_key;
 				break;
@@ -747,7 +827,7 @@ function parse_info_desc($info,$type,$vars='',$short=0,$tiptype=0)
 		if(!empty($vars))
 		{
 			if(!empty($info_tp)) $info_tp .= "\r";
-			if(!is_array($vars)) $vars = get_itmsk_array($vars); 
+			if(!is_array($vars)) $vars = get_itmsk_array($vars);
 			if($v_info == 'WG' || $v_info == 'WGK' || $v_info == 'WDG')
 			{
 				if(in_array('e',$vars) || in_array('w',$vars)) $info_tp.= "需装填「能源弹药」";
@@ -761,7 +841,7 @@ function parse_info_desc($info,$type,$vars='',$short=0,$tiptype=0)
 			if($v_info == 'WG' || $v_info == 'WGK' || $v_info == 'WDG') $info_tp.= "需装填「手枪弹药」";
 			if($v_info == 'WJ') $info_tp.= "需装填「重型弹药」";
 		}
-		
+
 		if(!empty($info_f)) $info_f = "class=\"{$info_f}\"";
 		if(!empty($info_tp)) $info_tp = "{$ttypes}=\"{$info_tp}\"";
 		if(!isset($iteminfo[$info])) $info = $v_info;
@@ -787,9 +867,9 @@ function parse_info_desc($info,$type,$vars='',$short=0,$tiptype=0)
 		else
 		{
 			# 数组化
-			if(!is_array($info)) $info = get_itmsk_array($info); 
+			if(!is_array($info)) $info = get_itmsk_array($info);
 			# 计数
-			$sk_max = count($info); $sk_nums = 0; 
+			$sk_max = count($info); $sk_nums = 0;
 			$sk_info = ''; $sk_tp = '';
 			# 属性中是否有奇迹属性？
 			if(in_array('x',$info)) $xflag = 1;
@@ -797,7 +877,7 @@ function parse_info_desc($info,$type,$vars='',$short=0,$tiptype=0)
 			{
 				$csk = $itemspkinfo[$sk];
 				# 检查属性有没有特殊样式
-				if(isset($tps_isk[$sk]['class'])) $csk = "<span class=\"".$tps_isk[$sk]['class']."\">".$csk."</span>"; 
+				if(isset($tps_isk[$sk]['class'])) $csk = "<span class=\"".$tps_isk[$sk]['class']."\">".$csk."</span>";
 				# 将属性加入显示队列
 				$sk_info .= $csk;
 				# 如果不是最后一个属性 显示一个 + 号
@@ -814,7 +894,7 @@ function parse_info_desc($info,$type,$vars='',$short=0,$tiptype=0)
 						# 换行
 						if($sk_nums<$sk_max-1) $sk_tp .= "\r";
 					}
-					else 
+					else
 					{
 						$sk_tp = !empty($xflag) && isset($tps_isk[$sk]['x-title']) ? $tps_isk[$sk]['x-title'] : $tps_isk[$sk]['title'];
 					}
@@ -823,7 +903,7 @@ function parse_info_desc($info,$type,$vars='',$short=0,$tiptype=0)
 			}
 			if(!empty($sk_info)) $ret = $sk_info;
 			if($sk_max > $short_nums && $short) $ret = $itemspkinfo[$info[0]]."+...+".$itemspkinfo[end($info)];
-			if(!empty($sk_tp)) 
+			if(!empty($sk_tp))
 			{
 				$ret = "<span {$ttypes}=\"{$sk_tp}\">{$ret}</span>";
 			}
@@ -862,14 +942,14 @@ function get_itmsk_array($sk_value)
 	$i = 0;
 	while ($i < strlen($sk_value))
 	{
-		$sub = mb_substr($sk_value,$i,1,'utf-8'); 
+		$sub = mb_substr($sk_value,$i,1,'utf-8');
 		$i++;
 		if(!empty($sub) && array_key_exists($sub,$itemspkinfo)) array_push($ret,$sub);
 	}
-	return $ret;		
+	return $ret;
 }
 
-//还原itmsk为字符串 $max_length:字符串长度上限 
+//还原itmsk为字符串 $max_length:字符串长度上限
 function get_itmsk_strlen($sk_value,$max_length=30)
 {
 	global $itemspkinfo;
@@ -919,9 +999,65 @@ function set_clbpara($para,$key,$value)
 //将itmpara转为数组
 function get_itmpara($para)
 {
-	if(empty($para)) $para = Array();
-	if(!is_array($para)) return json_decode($para,true);
-	else return $para;
+	// 记录调试信息
+	$debug = "get_itmpara debug:\n";
+	$debug .= "Input type: " . gettype($para) . "\n";
+	$debug .= "Input value: " . (is_string($para) ? $para : (is_array($para) ? json_encode($para) : gettype($para))) . "\n";
+
+	// 修复：正确处理空数组 - 空数组不应该被当作"空"处理
+	if(empty($para) && !is_array($para)) {
+		$debug .= "Empty input (not array), returning empty array\n";
+		//error_log($debug);
+		return Array();
+	}
+
+	if(!is_array($para)) {
+		// 如果是字符串，尝试解析为 JSON
+		if(is_string($para)) {
+			$debug .= "Processing string input\n";
+
+			// 去除空白字符
+			$para = trim($para);
+			$debug .= "After trim: " . $para . "\n";
+
+			// 修复：检查是否是 JSON 格式（支持对象{}和数组[]）
+			if((substr($para, 0, 1) == '{' && substr($para, -1) == '}') ||
+			   (substr($para, 0, 1) == '[' && substr($para, -1) == ']')) {
+				$debug .= "Detected JSON format\n";
+
+				// 尝试修复可能的 JSON 格式问题
+				// 有时候 JSON 字符串可能被截断或损坏
+
+				// 尝试解析JSON
+				$result = json_decode($para, true);
+				$error = json_last_error();
+				$debug .= "JSON decode attempt: " . ($error === JSON_ERROR_NONE ? "success" : "failed") . "\n";
+
+				if($result !== null && $error === JSON_ERROR_NONE) {
+					$debug .= "JSON parsing successful\n";
+					//error_log($debug);
+					return $result;
+				} else {
+					$debug .= "JSON parsing failed: " . json_last_error_msg() . "\n";
+					$debug .= "Returning empty array\n";
+					//error_log($debug);
+					return array();
+				}
+			} else {
+				$debug .= "Not a JSON string, returning as is\n";
+				//error_log($debug);
+				return $para;
+			}
+		} else {
+			$debug .= "Not a string or array, returning empty array\n";
+			//error_log($debug);
+			return array();
+		}
+	} else {
+		$debug .= "Already an array, returning as is\n";
+		//error_log($debug);
+		return $para;
+	}
 }
 //获取itmpara中指定键
 function get_single_itmpara($para,$key)
@@ -946,12 +1082,12 @@ function set_itmpara($para,$key,$value)
 }
 
 // 正态分布
-function generate_ndnumbers($min, $max, $count = 10) 
+function generate_ndnumbers($min, $max, $count = 10)
 {
     $numbers = array();
     $mu = ($min + $max) / 2; // 计算区间均值
     $sigma = ($max - $min) / 6; // 计算区间标准差
-    for ($i = 0; $i < $count; $i++) 
+    for ($i = 0; $i < $count; $i++)
 	{
         $u1 = rand() / getrandmax();
         $u2 = rand() / getrandmax();
@@ -976,28 +1112,28 @@ function full_combination($a, $min) {
 		}
 	}
 	return $r;
-} 
+}
 
-function combination($a, $m) {  
-	$r = array();  
-	$n = count($a);  
-	if ($m <= 0 || $m > $n) {  
-	  return $r;  
+function combination($a, $m) {
+	$r = array();
+	$n = count($a);
+	if ($m <= 0 || $m > $n) {
+	  return $r;
 	}
-	for ($i=0; $i<$n; $i++) {  
-	  $t = array($a[$i]);  
-	  if ($m == 1) {  
-		$r[] = $t;  
-	  } else {  
-		$b = array_slice($a, $i+1);  
-		$c = combination($b, $m-1);  
-		foreach ($c as $v) {  
-		  $r[] = array_merge($t, $v);  
-		}  
-	  }  
-	}  
-	return $r;  
-  } 
+	for ($i=0; $i<$n; $i++) {
+	  $t = array($a[$i]);
+	  if ($m == 1) {
+		$r[] = $t;
+	  } else {
+		$b = array_slice($a, $i+1);
+		$c = combination($b, $m-1);
+		foreach ($c as $v) {
+		  $r[] = array_merge($t, $v);
+		}
+	  }
+	}
+	return $r;
+  }
 
 function mgzdecode($data)
 {
@@ -1031,17 +1167,17 @@ function json_encode_comp($par){
 		return urldecode(json_encode(url_encode($par)));
 	}
 }
-function url_encode($str) {  
-	if(is_array($str)) {  
-		foreach($str as $key=>$value) {  
-			$str[urlencode($key)] = url_encode($value);  
-		}  
-	} else {  
-		$str = urlencode($str);  
-	}  
-      
-	return $str;  
-} 
+function url_encode($str) {
+	if(is_array($str)) {
+		foreach($str as $key=>$value) {
+			$str[urlencode($key)] = url_encode($value);
+		}
+	} else {
+		$str = urlencode($str);
+	}
+
+	return $str;
+}
 
 //mb_strlen()兼容替代函数，直接照抄的网络
 if ( !function_exists('mb_strlen') ) {

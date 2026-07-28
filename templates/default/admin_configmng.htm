@@ -15,7 +15,7 @@
 	</tr>
 	<tr>
 	  <td>$lang['authkey']</td>
-	  <td><input type="text" name="authkey" value="$authkey" size="30" disabled="true"></td>
+	  <td><input type="text" name="authkey" value="$display_authkey_html" size="30" disabled="true"></td>
 	  <td>$lang['authkey_comment']</td>
 	</tr>
 	<tr>
@@ -30,19 +30,61 @@
 	</tr>
 	<tr>
 	  <td>$lang['bbsurl']</td>
-	  <td><input type="text" name="bbsurl" value="$bbsurl" size="30"></td>
+	  <td><input type="text" name="bbsurl" value="$bbsurl_html" size="30"></td>
 	  <td>$lang['bbsurl_comment']</td>
 	</tr>
 	<tr>
 	  <td>$lang['gameurl']</td>
-	  <td><input type="text" name="gameurl" value="$gameurl" size="30"></td>
+	  <td><input type="text" name="gameurl" value="$gameurl_html" size="30"></td>
 	  <td>$lang['gameurl_comment']</td>
 	</tr>
 	<tr>
 	  <td>$lang['homepage']</td>
-	  <td><input type="text" name="homepage" value="$homepage" size="30"></td>
+	  <td><input type="text" name="homepage" value="$homepage_html" size="30"></td>
 	  <td>$lang['homepage_comment']</td>
+	</tr>
+	<tr>
+	  <td colspan="3" style="background-color: #FFE4E1; text-align: center; font-weight: bold; color: #8B0000;">主从数据库配置 (只读显示)</td>
+	</tr>
+	<tr>
+	  <td>从服务器级别</td>
+	  <td><input type="text" value="$display_slave_level_html" size="30" disabled="true" style="background-color: #F5F5F5;"></td>
+	  <td>-1=反向迁移模式(本地主→远端从), 0=主服务器, 1=从服务器(手动迁移), 2=从服务器(自动同步), 3=从服务器(直接使用主数据库)</td>
+	</tr>
+	<tr>
+	  <td>目标服务器名称</td>
+	  <td><input type="text" value="$display_master_server_name_html" size="30" disabled="true" style="background-color: #F5F5F5;"></td>
+	  <td>用于显示的目标服务器名称（反向迁移模式下为远端从服务器）</td>
+	</tr>
+	<tr>
+	  <td>目标数据库服务器</td>
+	  <td><input type="text" value="$display_master_dbhost_html" size="30" disabled="true" style="background-color: #F5F5F5;"></td>
+	  <td>目标数据库服务器地址（反向迁移模式下为远端从数据库）</td>
+	</tr>
+	<tr>
+	  <td>目标数据库用户名</td>
+	  <td><input type="text" value="$display_master_dbuser_html" size="30" disabled="true" style="background-color: #F5F5F5;"></td>
+	  <td>目标数据库用户名（反向迁移模式下为远端从数据库）</td>
+	</tr>
+	<tr>
+	  <td>目标数据库密码</td>
+	  <td><input type="password" value="$display_master_dbpw_html" size="30" disabled="true" style="background-color: #F5F5F5;"></td>
+	  <td>目标数据库密码（反向迁移模式下为远端从数据库）</td>
+	</tr>
+	<tr>
+	  <td>目标数据库名</td>
+	  <td><input type="text" value="$display_master_dbname_html" size="30" disabled="true" style="background-color: #F5F5F5;"></td>
+	  <td>目标数据库名（反向迁移模式下为远端从数据库）</td>
+	</tr>
+	<tr>
+	  <td>目标数据库表前缀</td>
+	  <td><input type="text" value="$display_master_tablepre_html" size="30" disabled="true" style="background-color: #F5F5F5;"></td>
+	  <td>目标数据库表前缀（反向迁移模式下为远端从数据库）</td>
 	</tr>
 </table>
 <input type="submit" value="提交" onclick="$('command').value='edit';">
+<br><br>
+<div style="color: #8B0000; font-size: 12px; text-align: center;">
+	注意：主从数据库配置不能通过此界面修改，请直接编辑 config.inc.php 文件或重新运行安装脚本。
+</div>
 </form>

@@ -1,0 +1,31 @@
+# PHP Notice 错误修复
+
+## 问题描述
+在游戏初始化时，系统产生了大量的PHP Notice错误，主要集中在以下几个方面：
+1. `Undefined offset` 错误在 system.func.php 的第286行和第328行
+2. `Undefined variable: bwlist` 错误在 system.func.php 的第1137行
+
+## 修复方案
+
+### 1. 修复数组访问越界问题
+在 system.func.php 中，当处理商店物品和地图物品时，代码尝试访问数组中可能不存在的索引，导致了 `Undefined offset` 错误。
+
+修复方法：使用 `array_pad()` 函数确保数组有足够的元素，避免访问不存在的索引。
+
+修改位置：
+- 第177-190行：处理地图物品时，确保 `$item_parts` 数组至少有9个元素
+- 第307-320行：处理商店物品时，确保 `$lst` 数组至少有10个元素
+
+### 2. 修复未定义变量问题
+在 get_gambling_result 函数中，变量 `$bwlist` 在某些代码路径中可能未被初始化就被使用，导致了 `Undefined variable: bwlist` 错误。
+
+修复方法：在函数开始处初始化 `$bwlist` 变量为空数组。
+
+修改位置：
+- 第1026-1034行：在 get_gambling_result 函数开始处添加 `$bwlist = array();`
+
+## 修复效果
+这些修改应该能够消除游戏初始化过程中出现的PHP Notice错误，提高代码的健壮性和可靠性。
+
+## 注意事项
+虽然IDE报告了许多未使用的变量警告，但这些警告不会导致运行时错误，可以在后续优化中处理。

@@ -1,0 +1,128 @@
+修改时间：2024-12-14 14:30 (NOUVEAU DAY -115)
+修改文件：include/game/dice.func.php
+修改原因：修复极光天气下复活机制触发时的PHP致命错误
+
+问题描述：
+在极光天气下和特定NPC战斗，触发overrainbow技能被弹死时，出现了以下问题：
+1. 没有输出任何技能文案，直接反馈死亡界面
+2. 攻击可以将该NPC杀死，但NPC之后依然存活
+
+错误记录：
+[14-Jun-2025 02:36:08 Etc/GMT] PHP Fatal error: Uncaught Error: Cannot use assign-op operators with string offsets in /home2/a23336ht/public_html/dts1/include/game/dice.func.php:108
+
+错误分析：
+错误发生在 dice.func.php 第108行：$clbpara['diceRolled'] += 1;
+错误原因是 $clbpara['diceRolled'] 字段可能：
+1. 不存在（未初始化）
+2. 是一个字符串而不是数字
+
+当极光天气下复活机制触发时，会调用 diceroll(99) 函数，如果玩家的 clbpara['diceRolled'] 字段未初始化或为非数字值，就会导致 += 操作符失败。
+
+修改内容：
+在 dice.func.php 第108行之前添加了安全检查：
+```php
+// 确保 diceRolled 字段存在且为数字，避免 "Cannot use assign-op operators with string offsets" 错误
+if(!isset($clbpara['diceRolled']) || !is_numeric($clbpara['diceRolled'])) {
+    $clbpara['diceRolled'] = 0;
+}
+```
+
+修改逻辑：
+1. 检查 $clbpara['diceRolled'] 是否存在
+2. 检查该字段是否为数字类型
+3. 如果不存在或不是数字，则初始化为 0
+4. 然后安全地执行 += 操作
+
+预期效果：
+1. 修复极光天气下复活机制的PHP致命错误
+2. 确保 diceRolled 字段始终为数字类型
+3. 保持原有的骰子计数功能正常工作
+
+测试建议：
+1. 在极光天气下与具有overrainbow技能的NPC战斗
+2. 验证复活机制是否正常工作
+3. 检查是否还有其他类似的字段初始化问题
+
+后续发现的问题和修复：
+在进一步检查代码后，发现了更多类似的问题并进行了修复：
+
+1. include/game/dice.func.php 第76行：
+   - 问题：$clbpara['traitorRoll'] += 1; 可能导致同样的错误
+   - 修复：添加了 traitorRoll 字段的初始化检查
+
+2. include/state.func.php 第336行：
+   - 问题：$pd['clbpara']['lifedestroyed'] += 1; 可能导致同样的错误
+   - 修复：添加了 lifedestroyed 字段的初始化检查
+
+3. include/game/revevent.func.php 第44行和第66行：
+   - 问题：charge2 和 charge4 字段的 += 操作可能导致错误
+   - 修复：添加了数字类型检查
+
+4. include/game/team.func.php 第66行和第125行：
+   - 问题：$clbpara['achvars']['team'] 可能导致错误
+   - 修复：添加了 achvars 数组和 team 字段的初始化检查
+
+5. include/game/item2.func.php 第142行：
+   - 问题：$clbpara['achvars']['hack'] += 1; 可能导致错误
+   - 修复：添加了 achvars 数组和 hack 字段的初始化检查
+
+6. include/game/elementmix.func.php 第498行：
+   - 问题：$clbpara['achvars']['immix'] 可能导致错误
+   - 修复：添加了 achvars 数组的初始化检查
+
+修复模式：
+所有修复都遵循相同的模式：
+1. 检查字段是否存在 (!isset())
+2. 检查字段是否为数字类型 (!is_numeric()) - 对于数字字段
+3. 如果不满足条件，则初始化为适当的默认值（通常是0或空数组）
+4. 然后安全地执行 += 操作
+
+这些修复应该能够防止所有类似的 "Cannot use assign-op operators with string offsets" 错误。
+
+第二轮修复（针对持续出现的错误）：
+在实施了第一轮修复后，错误仍然出现在 dice.func.php 第118行，这表明问题的根本原因是 $clbpara 变量本身可能不是数组格式。
+
+进一步分析发现，在战斗系统中，$clbpara 可能以以下形式存在：
+1. JSON字符串格式（从数据库读取时）
+2. 未初始化的变量
+3. 空字符串
+
+因此，第二轮修复采用了更强的防护措施：
+
+修复策略：
+1. 首先检查 $clbpara 是否为数组 (!is_array($clbpara))
+2. 如果是字符串，尝试用 json_decode() 解析
+3. 如果解析失败或不是数组，初始化为空数组
+4. 然后再进行字段的存在性和类型检查
+
+修复的文件和位置：
+1. include/game/dice.func.php:
+   - 第114-130行：diceRolled 字段的完整防护
+   - 第75-91行：traitorRoll 字段的完整防护
+
+2. include/state.func.php:
+   - 第334-350行：lifedestroyed 字段的完整防护
+
+3. include/game/revevent.func.php:
+   - 第37-54行：charge2 和 charge4 字段的完整防护
+
+4. include/game/team.func.php:
+   - 第64-77行：创建队伍时的 achvars['team'] 字段防护
+   - 第133-147行：加入队伍时的 achvars['team'] 字段防护
+
+5. include/game/item2.func.php:
+   - 第140-157行：achvars['hack'] 字段的完整防护
+
+6. include/game/elementmix.func.php:
+   - 第496-509行：achvars['immix'] 字段的完整防护
+
+这种三层防护机制应该能够彻底解决 "Cannot use assign-op operators with string offsets" 错误：
+- 第一层：确保 $clbpara 是数组
+- 第二层：确保目标字段存在
+- 第三层：确保目标字段是正确的数据类型
+
+预期效果：
+1. 完全消除极光天气下复活机制的PHP致命错误
+2. 防止所有涉及 clbpara 字段的 += 操作错误
+3. 提高游戏系统的整体稳定性
+4. 确保数据类型的一致性

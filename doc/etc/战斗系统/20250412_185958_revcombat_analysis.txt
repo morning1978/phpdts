@@ -1,0 +1,143 @@
+# RevCombat System Analysis
+
+The revcombat system is a sophisticated battle system in phpdts that handles combat encounters, battle preparation, attack calculation, and damage resolution. It's organized into three main namespaces:
+
+## 1. Namespace Structure and Responsibilities
+
+### revbattle Namespace
+- **Purpose**: Handles encounter mechanics and battle initialization
+- **Key Files**: 
+  - `revbattle.calc.php`: Calculates encounter rates, dodge rates, and initiative rates
+  - `revbattle.func.php`: Manages enemy encounters, battle UI, and escape mechanics
+
+### revcombat Namespace
+- **Purpose**: Manages battle preparation and overall combat flow
+- **Key Files**:
+  - `revcombat.func.php`: Core combat functions including preparation and execution
+  - `revcombat_extra.func.php`: Additional combat functions for special cases
+  - `revcombat.calc.php`: Calculates counter-attack rates, pursuit chances, etc.
+
+### revattr Namespace
+- **Purpose**: Handles attribute calculations and damage resolution
+- **Key Files**:
+  - `revattr.func.php`: Core attribute and damage calculation functions
+  - `revattr.calc.php`: Specialized damage calculations and skill modifiers
+  - `revattr_extra.func.php`: Special NPC combat mechanics
+
+## 2. Combat Flow
+
+The combat system follows a detailed flow:
+
+### Pre-Encounter Phase
+1. When a player moves or searches, `\revbattle\calc_meetman_rate($data)` calculates encounter probability
+2. If an encounter occurs, `\revbattle\calc_hide_rate($data,$edata)` determines if the enemy can dodge
+3. If the enemy doesn't dodge, `\revbattle\calc_active_rate($data,$edata)` calculates initiative probability
+4. Based on initiative:
+   - Player has initiative: `\revbattle\findenemy_rev($edata)` shows battle interface
+   - Enemy has initiative: `\revcombat\rev_combat_prepare($edata,$data,0)` starts combat preparation
+
+### Battle Preparation Phase
+1. `rev_combat_prepare()` initializes combat parameters:
+   - Records battle skill ID in `$pa['bskill']` if player used a skill
+   - Sets attacker/defender names in `$pa['nm']` and `$pd['nm']`
+   - Calls `get_attr_wepbase()` to initialize attack parameters for both sides:
+     - Determines defender's weapon type and passive skills
+     - Calculates weapon ranges and skill levels
+     - Determines attacker's weapon type and active/passive skills
+
+### Combat Execution Phase
+1. `rev_combat()` executes the combat sequence:
+   - Calls `combat_prepare_events()` for one-time battle events
+   - Calls `combat_prepare_logs()` to display encounter text
+   - Executes attacker's strike with `rev_attack()`
+   - Processes combat results with `rev_combat_result()`
+   - Checks for counter-attack possibility
+   - Updates global combat information
+   - Saves logs and finalizes battle results
+
+### Attack Resolution Phase
+1. `rev_attack()` calculates damage:
+   - Gets equipment and weapon attribute information
+   - Performs hit rate calculations
+   - If hit is successful:
+     - Calculates physical damage (base attack vs. defense)
+     - Calculates attribute damage (elemental effects)
+     - Applies final damage modifiers
+   - Processes experience, rage, and weapon durability
+
+### Combat Result Phase
+1. `rev_combat_result()` handles the aftermath:
+   - If defender's HP drops to zero:
+     - Processes kill/revival events
+     - Handles NPC second-phase transformations
+     - Records death method and last words
+   - If defender survives:
+     - Processes post-damage events (stun, etc.)
+
+## 3. Damage Calculation System
+
+The damage calculation is particularly complex:
+
+### Physical Damage Calculation
+1. Base attack calculation (`get_base_att`):
+   - Considers weapon effectiveness, player stats, and modifiers
+   - Applies weather, location, posture, and status modifiers
+   
+2. Base defense calculation (`get_base_def`):
+   - Considers armor effectiveness, player stats, and modifiers
+   - Applies similar environmental and status modifiers
+
+3. Original damage calculation (`get_original_dmg_rev`):
+   - Formula: (base_attack / base_defense) * weapon_skill * skill_damage_factor
+   - Applies damage fluctuation based on weapon type
+   - Applies club skill modifiers
+
+4. Damage multiplier calculation:
+   - Processes attacker's damage multipliers (critical hits, combo attacks)
+   - Processes defender's damage multipliers (armor penetration, special defenses)
+
+### Attribute Damage Calculation
+1. Determines applicable attribute damage types from weapons and equipment
+2. For each attribute:
+   - Calculates base attribute damage
+   - Applies weapon affinity modifiers
+   - Checks for attribute defense or penetration
+   - Applies status effect modifiers
+   - Calculates final attribute damage
+
+### Final Damage Resolution
+1. Combines physical and attribute damage
+2. Applies final damage multipliers from skills and effects
+3. Applies fixed damage modifiers (additional damage, damage control)
+4. Processes special cases (instant death, pure damage)
+5. Applies the damage to the defender's HP
+
+## 4. Special Combat Mechanics
+
+The system includes numerous special mechanics:
+
+1. **Counter-attack System**: Defenders can counter-attack based on range and probability
+2. **Pursuit System**: Attackers can pursue fleeing enemies
+3. **Cooperative Attack**: Players can team up against enemies
+4. **Weapon Durability**: Weapons can be damaged or consumed during combat
+5. **Status Effects**: Combat can inflict various status effects
+6. **Armor Damage**: Attacks can damage defender's armor
+7. **Special NPC Mechanics**: Certain NPCs have unique combat behaviors
+
+## 5. Skill Integration
+
+The combat system deeply integrates with the skill system:
+
+1. **Battle Skills**: Active skills that can be used during combat
+2. **Passive Skills**: Always-active skills that modify combat parameters
+3. **Club Skills**: Skills based on player's club/organization
+4. **Buff Skills**: Temporary enhancements that affect combat
+
+Each skill can modify various aspects of combat, including:
+- Hit rates and attack counts
+- Damage calculations and multipliers
+- Attribute damage effectiveness
+- Defense capabilities
+- Special effects (stun, instant kill, etc.)
+
+The revcombat system represents a sophisticated battle engine with multiple layers of calculation and numerous special cases to handle different combat scenarios, making it both flexible and complex.

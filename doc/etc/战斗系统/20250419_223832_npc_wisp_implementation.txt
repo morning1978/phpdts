@@ -1,0 +1,93 @@
+# NPC技能实装：指像（npc_wisp）
+
+## 功能概述
+
+实现了"指像"（npc_wisp）技能，这是一个专为NPC设计的被动技能。除了和特定的player战斗之外，和其他玩家战斗造成和受到的伤害均变为0。
+
+## 实装内容
+
+1. 在 `gamedata/cache/clubskills_1.php` 文件中添加了 `npc_wisp` 技能的定义
+2. 在 `include/game/revattr.func.php` 文件的 `get_fix_damage` 函数中添加了指像技能的处理逻辑
+
+## 实装细节
+
+### 1. 技能定义
+
+在 `clubskills_1.php` 文件中添加了以下技能定义：
+
+```php
+'npc_wisp' => Array
+(
+    'name' => '指像',
+    'tags' => Array('passive'),
+    'desc' => '除了和特定的player战斗之外，和其他玩家战斗造成和受到的伤害均变为0。',
+    'svars' => Array(
+        'targets' => Array(), // 初始无目标
+    ),
+),
+```
+
+这个技能定义了一个名为"指像"的被动技能，它有一个存储目标玩家ID列表的数组参数 `targets`。
+
+### 2. 技能效果实现
+
+在 `revattr.func.php` 文件的 `get_fix_damage` 函数中添加了指像技能的处理逻辑：
+
+```php
+# 「指像」效果判定：
+if(($pa['type'] && !empty($pa['clbpara']['skill']) && in_array('npc_wisp', $pa['clbpara']['skill']) && !$pd['type']) || 
+   ($pd['type'] && !empty($pd['clbpara']['skill']) && in_array('npc_wisp', $pd['clbpara']['skill']) && !$pa['type']))
+{
+    $is_target = false;
+    
+    // 检查玩家是否在NPC的目标列表中
+    if($pa['type'] && !empty($pa['clbpara']['skillpara']['npc_wisp']['targets']))
+    {
+        $targets = $pa['clbpara']['skillpara']['npc_wisp']['targets'];
+        if(in_array($pd['pid'], $targets)) $is_target = true;
+    }
+    elseif($pd['type'] && !empty($pd['clbpara']['skillpara']['npc_wisp']['targets']))
+    {
+        $targets = $pd['clbpara']['skillpara']['npc_wisp']['targets'];
+        if(in_array($pa['pid'], $targets)) $is_target = true;
+    }
+    
+    // 如果玩家不在目标列表中，伤害变为0
+    if(!$is_target)
+    {
+        $npc_name = $pa['type'] ? $pa['nm'] : $pd['nm'];
+        $player_name = $pa['type'] ? $pd['nm'] : $pa['nm'];
+        $log .= "<span class='yellow'>「指像」技能发动！{$player_name}不是{$npc_name}的目标，伤害变为0！</span><br>";
+        return 0;
+    }
+}
+```
+
+这段代码首先检查战斗中是否有NPC拥有指像技能，然后检查玩家是否在NPC的目标列表中。如果玩家不在目标列表中，则将伤害设为0并显示相应的提示信息。
+
+## 使用方法
+
+### 为NPC添加指像技能
+
+```php
+// 添加技能
+$npc['clbpara']['skill'][] = 'npc_wisp';
+
+// 初始化技能参数（如果不存在）
+if(!isset($npc['clbpara']['skillpara']['npc_wisp'])) {
+    $npc['clbpara']['skillpara']['npc_wisp'] = array(
+        'targets' => array() // 初始无目标
+    );
+}
+
+// 添加目标玩家
+$npc['clbpara']['skillpara']['npc_wisp']['targets'][] = $player_pid; // $player_pid 是目标玩家的ID
+```
+
+## 注意事项
+
+1. 这个技能专为NPC设计，玩家不应该获得此技能
+2. 技能效果会在NPC与玩家战斗时自动触发，不需要手动激活
+3. 如果NPC的目标列表为空，则对所有玩家造成的伤害都为0
+4. 如果需要NPC能够对多个玩家造成伤害，需要将所有目标玩家的ID添加到目标列表中
+5. 这个技能可以用于创建只针对特定玩家的NPC，例如任务相关的NPC或者特殊事件的NPC

@@ -1,0 +1,134 @@
+NOUVEAU DAY 68 - ACDTS298 ALL RANDOM RuleSet 实装记录
+时间：2025-06-15
+操作：实装新的全随机RuleSet
+
+=== 实装内容 ===
+
+1. RuleSet配置
+   - 在 gamedata/ruleset/ruleset_config.php 中添加了新的RuleSet配置
+   - 名称：ACDTS298 ALL RANDOM
+   - 基于：ACDTS_298SP4
+   - 特性：全地图物品随机刷新，全NPC随机刷新，物品属性完全随机化
+
+2. 特性实现
+   A. 全地图物品随机刷新
+      - 修改了 gamedata/ruleset/ACDTS_298SP4_AR/include/system.func.php
+      - 在地图物品刷新逻辑中添加全随机模式检测
+      - 当检测到 $gamevars['ruleset_version'] == 'ACDTS_298SP4_AR' 时，所有物品都随机刷新到任意地点
+
+   B. 全NPC随机刷新
+      - 在同一文件的addnpc函数中添加全随机模式检测
+      - 当为全随机模式时，所有NPC都随机刷新到任意地点（排除地点34）
+
+   C. 物品属性随机化
+      - 修改了 gamedata/ruleset/ACDTS_298SP4_AR/include/game/itemmain.func.php
+      - 在itemget函数中添加随机化逻辑，影响捡拾物品
+      - 修改了 gamedata/ruleset/ACDTS_298SP4_AR/include/game/itemmix.func.php
+      - 在itemmix_events函数中添加随机化逻辑，影响合成物品
+
+3. 随机化规则
+   - itme和itms：在0到原数值的2~7倍之间随机生成，最小值为1
+   - itmsk：从resources_1.php的$itemspkinfo中随机选择1-3个属性组合
+
+4. 文件结构
+   - 创建了 gamedata/ruleset/ACDTS_298SP4_AR/include/ 目录
+   - 创建了 gamedata/ruleset/ACDTS_298SP4_AR/include/game/ 目录
+   - 复制并修改了三个核心文件：
+     * system.func.php
+     * itemmain.func.php
+     * itemmix.func.php
+
+5. override_modules配置
+   - 在RuleSet配置中设置了override_modules，指向修改后的文件
+   - 确保游戏加载RuleSet专用的逻辑文件而不是默认文件
+
+=== 技术细节 ===
+
+1. 全随机模式检测
+   - 使用 $gamevars['ruleset_version'] == 'ACDTS_298SP4_AR' 进行检测
+   - 在clbpara中也设置了 'all_random_mode' => true 标记
+
+2. 随机化实现
+   - 物品刷新：使用 rand(1,$plsnum-1) 随机选择地点
+   - NPC刷新：同样使用 rand(1,$plsnum-1)，排除地点34
+   - 属性随机化：使用 rand(2,7) 生成倍数，rand(0, 原值*倍数) 生成新值
+
+3. 资源文件引用
+   - 使用 include_once GAME_ROOT.'./gamedata/ruleset/ACDTS_298SP4_AR/cache/resources_1.php'
+   - 从$itemspkinfo中获取可用的物品属性键值
+
+=== 用户体验 ===
+
+1. 视觉反馈
+   - 在物品获得和合成时显示"【全随机模式】物品属性已随机化！"提示
+   - 使用cyan颜色突出显示随机化信息
+
+2. 游戏平衡
+   - 设置了最小值保护，防止属性为0
+   - 保持了原有的特殊物品逻辑（如诅咒物品等）
+
+=== 补充实装 ===
+
+4. 额外物品获得途径覆盖
+   - 复制并添加了 item.giftbox.php（礼品盒开启）
+   - 复制并添加了 item.other.php（其他特殊物品使用）
+   - 复制并添加了 item.dice.php（骰子类物品）
+   - 这些文件都使用itemget函数，所以随机化逻辑会自动应用
+
+5. 最终override_modules配置
+   - system.func.php：地图物品和NPC随机刷新
+   - itemmain.func.php：物品捡拾随机化
+   - itemmix.func.php：物品合成随机化
+   - item.giftbox.php：礼品盒物品随机化
+   - item.other.php：特殊物品使用随机化
+   - item.dice.php：骰子物品随机化
+
+6. 随机化覆盖范围
+   - 地图物品刷新：100%随机位置
+   - NPC刷新：100%随机位置
+   - 物品捡拾：属性完全随机化
+   - 物品合成：属性完全随机化
+   - 商店购买：属性完全随机化（通过itemget）
+   - 礼品盒开启：属性完全随机化
+   - 特殊物品使用：属性完全随机化
+   - 骰子物品：属性完全随机化
+   - 尸体搜刮：属性完全随机化（通过itemget）
+   - 同调合成：属性完全随机化（通过itemget）
+
+=== 下一步 ===
+
+1. 需要测试RuleSet是否能正确加载
+2. 验证随机化逻辑是否正常工作
+3. 测试各种物品获得途径的随机化效果
+4. 可能需要调整随机化参数以获得更好的游戏体验
+
+=== 问题诊断与修复 ===
+
+在测试中发现override_modules功能没有正常工作，表现为：
+1. 物品和NPC刷新依旧有规律
+2. 物品获得时没有显示随机化log，且属性没有被随机化
+
+问题原因：
+1. RuleSet的override_modules功能还没有被实现
+2. 游戏中的include文件都是直接使用include_once加载，没有经过任何override机制
+
+解决方案：
+1. 创建了 include/ruleset_override.func.php 文件覆盖系统
+2. 修改了 include/common.inc.php 的加载顺序，先初始化覆盖系统再加载system.func.php
+3. 实现了文件覆盖机制，通过复制文件的方式实现覆盖
+4. 修改了随机化检测逻辑，直接查询数据库获取房间的RuleSet信息
+
+技术实现：
+1. setup_file_overrides()函数：备份原文件，用覆盖文件替换原文件
+2. restore_original_files()函数：恢复原始文件
+3. 修改了所有随机化检测代码，使用数据库查询而不是依赖clbpara
+
+=== 注意事项 ===
+
+1. 该RuleSet继承了ACDTS_298SP4的所有资源和配置
+2. 只覆盖了必要的逻辑文件，其他功能保持不变
+3. 随机化只在该RuleSet中生效，不影响其他RuleSet
+4. 所有通过itemget函数获得的物品都会被随机化
+5. 随机化检测使用数据库查询房间的gruleset字段进行判断
+6. 文件覆盖通过物理复制实现，需要确保文件权限正确
+7. 覆盖系统会自动备份原文件到gamedata/backup_original/目录

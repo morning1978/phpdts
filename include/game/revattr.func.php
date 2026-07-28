@@ -24,32 +24,32 @@ namespace revattr
 		$w2 = !empty($w2) && isset($attinfo[$w2]) ? $w2 : '';
 
 		# 输入了预设的攻击方式，检查是否合法
-		if(!empty($wep_kind)) 
+		if(!empty($wep_kind))
 		{
 			if(strpos($pa['wepk'],$wep_kind)!==false) $pa['wep_kind'] = $wep_kind;
 			else $pa['wep_kind'] = $wep_kind == $w2 ? $w2 : $w1;
 		}
 		# 没有输入预设攻击方式，自动选择
-		else 
+		else
 		{
 			if(empty($w2))
 			{
 				$pa['wep_kind'] = $w1;
 			}
-			else 
+			else
 			{
 				# 射系武器没有子弹的情况下，自动选用第二攻击模式
 				if(($w1 == 'G' || $w1 == 'J') && $pa['weps'] == $nosta)
 				{
 					$pa['wep_kind'] = $w2;
 				}
-				elseif(($w2 == 'G' || $w2 == 'J') && $pa['weps'] == $nosta) 
+				elseif(($w2 == 'G' || $w2 == 'J') && $pa['weps'] == $nosta)
 				{
 					$pa['wep_kind'] = $w1;
 				}
 				# 检查策略模式：射程优先 & 熟练优先
 				else
-				{				
+				{
 					$pa['wep_kind'] = $w1; $w1_skill = get_wep_skill($pa); $w1_range = get_wep_range($pa);
 					$pa['wep_kind'] = $w2; $w2_skill = get_wep_skill($pa); $w2_range = get_wep_range($pa);
 					# 传入pd射程，且当前两种攻击方式在射程判定上没有区别，则熟练优先
@@ -57,7 +57,7 @@ namespace revattr
 					{
 						$pa['wep_kind'] = $w1_skill > $w2_skill ? $w1 : $w2;
 					}
-					else 
+					else
 					{
 						# 两把武器熟练都大于250的情况下，射程优先
 						if($w1_skill > 250 && $w2_skill > 250) $pa['wep_kind'] = $w1_range > $w2_range ? $w1 : $w2;
@@ -90,7 +90,7 @@ namespace revattr
 		if(empty($pa['wep_kind'])) get_wep_kind($pa);
 
 		$range = isset($rangeinfo[$pa['wep_kind']]) ? $rangeinfo[$pa['wep_kind']] : NULL;
-		
+
 		//弓系射程随熟练增加，每200点加1，最多加3
 		if($pa['wep_kind']=='B') {
 			$r_add = floor($pa[$skillinfo[$pa['wep_kind']]] / 200);
@@ -181,7 +181,7 @@ namespace revattr
 				if(!$pd['type'] && $pd['nm']!='你') $pd['logsave'] .= "<span class=\"yellow\">{$pa['name']}</span>对你发动了技能<span class=\"red\">「{$bsk_name}」</span>！";
 				elseif(!$pa['type'] && $pa['nm']!='你') $pa['logsave'] .= "你对<span class=\"yellow\">{$pd['name']}</span>发动了技能<span class=\"red\">「{$bsk_name}」</span>！";
 			}
-			else 
+			else
 			{
 				# 主动技不满足使用条件或来源非法，直接注销标记
 				unset($pa['bskill']);
@@ -256,8 +256,18 @@ namespace revattr
 							$pa['skill_c12_swell'] = $pa['hp'] <= $pa['mhp']*0.3 ? 2 : 1;
 						}
 					}
+					# 「奇机」特殊判定：
+					elseif($sk == 'tl_2ndchance')
+					{
+						$pa['skill_tl_2ndchance'] = 1;
+					}
+					# 「起迹」特殊判定：
+					elseif($sk == 'tl_oncemore')
+					{
+						$pa['skill_tl_oncemore'] = 1;
+					}
 					# 其他非特判技能，默认给一个触发标记
-					else 
+					else
 					{
 						$pa['skill_'.$sk] = 1;
 						//$pa['skill_'.$sk.'_log'] = "";
@@ -429,10 +439,10 @@ namespace revattr
 				}else{
 					$log .= "<span class=\"yellow\">{$pa['nm']}成功地复制了对手的武器！</span><br>";
 					$log .= "<span class=\"yellow\">临摹装置化作了<span class=\"red\">{$pd['wep']}</span>！</span><br><br>";
-					//从原属性数组中剔除当前武器属性 
+					//从原属性数组中剔除当前武器属性
 					if(!empty($pa['wepsk'])) unset_ex_from_array($pa,get_itmsk_array($pa['wepsk']));
 					$pa['wep'] = $pd['wep']; $pa['wepk'] = $pd['wepk']; $pa['wepsk'] = $pd['wepsk'];
-					$pa['wepe'] = $pd['wepe']; $pa['weps'] = $pd['weps']; 
+					$pa['wepe'] = $pd['wepe']; $pa['weps'] = $pd['weps'];
 					//没有灵抽的情况下，向属性数组中打入复制后武器的属性
 					if(!isset($pa['sldr_flag'])) $pa['ex_keys'] = array_merge($pa['ex_keys'],get_itmsk_array($pa['wepsk']));
 					get_wep_kind($pa);
@@ -441,16 +451,16 @@ namespace revattr
 			}
 			else
 			{
-				$log .= "<span class=\"red\">但是似乎失败了！</span><br>";	
+				$log .= "<span class=\"red\">但是似乎失败了！</span><br>";
 			}
 		}
-		
+
 		# 存在其他方式提供的暴毙死法，也中止后续战斗动作。
 		if(isset($pa['gg_flag']))
 		{
 			return -1;
 		}
-		
+
 		return 0;
 	}
 
@@ -461,7 +471,7 @@ namespace revattr
 		//基础命中率
 		$hitrate = $hitrate_obbs[$pa['wep_kind']];
 		//熟练度修正
-		$hitrate += round($pa['wep_skill'] * $hitrate_r[$pa['wep_kind']]); 
+		$hitrate += round($pa['wep_skill'] * $hitrate_r[$pa['wep_kind']]);
 		//武器基础命中率上限
 		$hitrate = min($hitrate_max_obbs[$pa['wep_kind']],$hitrate);
 		//获取社团技能对基础命中率的修正（旧）
@@ -469,7 +479,7 @@ namespace revattr
 		//获取社团技能对基础命中率的修正（新）
 		$hitrate = get_clbskill_hitrate($pa,$pd,$active,$hitrate);
 		//异常状态状态修正
-		foreach ($inf_htr_p as $inf_ky => $value) 
+		foreach ($inf_htr_p as $inf_ky => $value)
 		{
 			if(strpos($pa['inf'], $inf_ky)!==false) $hitrate *= $value;
 		}
@@ -480,7 +490,7 @@ namespace revattr
 	}
 
 	//获取命中次数
-	function get_hit_time_rev(&$pa,&$pd,$active) 
+	function get_hit_time_rev(&$pa,&$pd,$active)
 	{
 		global $nosta,$wepimprate,$infobbs;
 
@@ -521,7 +531,7 @@ namespace revattr
 				$wep_imp_obbs *= get_skillvars('c2_butcher','wepimpr');
 			}
 		}
-		else 
+		else
 		{
 			//消耗型武器 每次连击必定消耗1
 			$wep_imp_obbs = 100;
@@ -538,15 +548,15 @@ namespace revattr
 		{
 			$atk_t = $pa['weps']==$nosta ? $atk_t : min($atk_t,$pa['weps']);
 		}
-		
+
 		//计算实际命中次数
 		$pa['hitrate_times'] = $pa['inf_times'] = $pa['wep_imp_times'] = 0;
-		for($i = 1; $i <= $atk_t; $i ++) 
+		for($i = 1; $i <= $atk_t; $i ++)
 		{
 			$dice = diceroll(99);
 			$dice2 = diceroll(99);
 			$dice3 = diceroll(99);
-			if ($dice < $pa['hitrate']) 
+			if ($dice < $pa['hitrate'])
 			{
 				//增加命中次数
 				$pa['hitrate_times'] += 1;
@@ -575,6 +585,72 @@ namespace revattr
 	{
 		global $log,$nosta;
 
+		# RuleSet钩子：允许当前规则集优先提供固定伤害。
+		# RuleSet hook: allow the active ruleset to provide fixed damage first.
+		if(function_exists('ruleset_get_fix_damage_hook'))
+		{
+			$ruleset_fix_damage = ruleset_get_fix_damage_hook($pa,$pd,$active);
+			if($ruleset_fix_damage !== NULL) return $ruleset_fix_damage;
+		}
+
+		# 「指像」效果判定：
+		if(($pa['type'] && !empty($pa['clbpara']['skill']) && in_array('npc_wisp', $pa['clbpara']['skill']) && !$pd['type']) ||
+		   ($pd['type'] && !empty($pd['clbpara']['skill']) && in_array('npc_wisp', $pd['clbpara']['skill']) && !$pa['type']))
+		{
+			$is_target = false;
+
+			// 检查玩家是否在NPC的目标列表中
+			if($pa['type'] && !empty($pa['clbpara']['skillpara']['npc_wisp']['targets']))
+			{
+				$targets = $pa['clbpara']['skillpara']['npc_wisp']['targets'];
+				if(in_array($pd['pid'], $targets)) $is_target = true;
+			}
+			elseif($pd['type'] && !empty($pd['clbpara']['skillpara']['npc_wisp']['targets']))
+			{
+				$targets = $pd['clbpara']['skillpara']['npc_wisp']['targets'];
+				if(in_array($pa['pid'], $targets)) $is_target = true;
+			}
+
+			// 如果玩家不在目标列表中，伤害变为0
+			if(!$is_target)
+			{
+				$npc_name = $pa['type'] ? $pa['nm'] : $pd['nm'];
+				$player_name = $pa['type'] ? $pd['nm'] : $pa['nm'];
+				$log .= "<span class='yellow'>「指像」技能发动！{$player_name}不是{$npc_name}的目标，伤害变为0！</span><br>";
+				return 0;
+			}
+		}
+
+		# 「来潮」效果判定：
+		if((!empty($pa['clbpara']['skill']) && in_array('npc_mecstasy', $pa['clbpara']['skill']) && !empty($pa['clbpara']['skillpara']['npc_mecstasy']['active'])) ||
+		   (!empty($pd['clbpara']['skill']) && in_array('npc_mecstasy', $pd['clbpara']['skill']) && !empty($pd['clbpara']['skillpara']['npc_mecstasy']['active'])))
+		{
+			# 判定技能触发者名称（玩家或NPC）
+			$mec_owner_nm = (!empty($pa['clbpara']['skill']) && in_array('npc_mecstasy', $pa['clbpara']['skill']) && !empty($pa['clbpara']['skillpara']['npc_mecstasy']['active'])) ? $pa['nm'] : $pd['nm'];
+			# 检查是否对种火玩家无效
+			if((!empty($pd['clbpara']['skill']) && (in_array('fireseed3', $pd['clbpara']['skill']) || in_array('fireseed4', $pd['clbpara']['skill']))) || $pd['def'] > 10000)
+			{
+				$log .= "<span class='red'>{$mec_owner_nm}展开了Ecstasy Mode结界！但{$pd['nm']}早已不受这种东西的影响了！</span><br>";
+				return 0;
+			}
+
+			# 检查防守方是否有「勇谍」技能且HP大于200
+			if(!empty($pd['clbpara']['skill']) && in_array('npc_perfectspy', $pd['clbpara']['skill']) && $pd['hp'] > 200 && $pd['hp'] - $pa['wepe'] < 200)
+			{
+				# 先记录「来潮」效果的文案
+				$log .= "<span class='red'>{$mec_owner_nm}展开了Ecstasy Mode结界！武器直接造成了等同于其效果值的真实伤害！</span><br>";
+
+				# 然后计算「勇谍」效果保护后的伤害
+				$damage = $pd['hp'] - 200;
+				$log .= "<span class='yellow'>「勇谍」技能发动！{$pd['nm']}的生命值不会低于200！</span><br>";
+				return $damage;
+			}
+
+			$damage = $pa['wepe'];
+			$log .= "<span class='red'>{$mec_owner_nm}展开了Ecstasy Mode结界！武器直接造成了等同于其效果值的真实伤害！</span><br>";
+			return $damage;
+		}
+
 		# 黑熊吃香蕉事件：
 		if($pa['type'] && in_array('X',$pa['ex_keys']))
 		{
@@ -591,7 +667,7 @@ namespace revattr
 
 		# 真红暮防御事件：
 		if($pd['type'] == 19 && $pd['name'] == '红暮')
-		{	
+		{
 			$p = attr_extra_19_crimson($pa,$pd,$active,'defend');
 			if(isset($p)) return $p;
 		}
@@ -604,7 +680,7 @@ namespace revattr
 			{
 				$log .= "<span class=\"yellow\">{$pa['nm']}的攻击不受「天佑」影响！</span><br>";
 			}
-			else 
+			else
 			{
 				$log .= "<span class=\"yellow\">「天佑」使{$pa['nm']}的攻击没能造成任何伤害！</span><br>";
 				return 0;
@@ -623,7 +699,7 @@ namespace revattr
 					return 0;
 				}
 			}
-			else 
+			else
 			{
 				if($pd['arte'] > 1)
 				{
@@ -702,11 +778,11 @@ namespace revattr
 
 		# 计算武器面板攻击：
 		//空手 武器伤害=2/3熟练度
-		if($pa['wep_kind'] == 'N') 
+		if($pa['wep_kind'] == 'N')
 		{
 			if(!isset($pa['wep_skill'])) $pa['wep_skill'] = get_wep_skill($pa);
 			$pa['wepe_t'] = round($pa['wep_skill']*2/3);
-			
+
 			#「拳法」效果判定，在空手基础上再额外增加
 			if(isset($pa['skill_c13_kungfu']))
 			{
@@ -714,13 +790,13 @@ namespace revattr
 			}
 		}
 		//射系 武器伤害=面板数值
-		elseif($pa['wep_kind'] == 'G' || $pa['wep_kind'] == 'J') 
+		elseif($pa['wep_kind'] == 'G' || $pa['wep_kind'] == 'J')
 		{
 			$pa['wepe_t'] = $pa['wepe'];
 		}
 		//枪托打人 武器伤害=面板数值/5
 		//弓当斩系武器也用同一个数值好了，懒得多想
-		elseif(isset($pa['is_wpg'])) 
+		elseif(isset($pa['is_wpg']))
 		{
 			$pa['wepe_t'] = round ($pa['wepe']/ 5 );
 		}
@@ -744,7 +820,7 @@ namespace revattr
 		$base_att = get_base_att_modifier($pa,$pd,$active,$base_att,$tooltip);
 		return $base_att;
 	}
-	
+
 	//获取pa的攻击力修正
 	function get_base_att_modifier(&$pa,&$pd,$active,$base_att,$tooltip=0)
 	{
@@ -768,15 +844,23 @@ namespace revattr
 		$base_atk_per += $wth_atk_per+$pls_atk_per+$pose_atk_per+$tac_atk_per;
 		$base_atk_per = $base_atk_per > 0 ? $base_atk_per : 1;
 
+		# 「解放」技能判定：基础攻击力增加
+		if(!empty($pa['clbpara']['skill']) && in_array('npc_wrelease', $pa['clbpara']['skill']) && !empty($pa['clbpara']['skillpara']['npc_wrelease']['active']))
+		{
+			$level = isset($pa['clbpara']['skillpara']['npc_wrelease']['level']) ? $pa['clbpara']['skillpara']['npc_wrelease']['level'] : 2;
+			$base_att *= $level;
+			if(!$tooltip) $log .= "<span class='yellow'>{$pa['nm']}进行了野生解放，基础攻击力增加了{$level}倍！</span><br>";
+		}
+
 		# 计算受伤状态对pa攻击力的修正
 		$inf_atk_per = 100;
 		if(!empty($pa['inf']))
 		{
 			global $inf_att_p;
-			foreach ($inf_att_p as $inf_ky => $value) 
+			foreach ($inf_att_p as $inf_ky => $value)
 			{
 				if(strpos($pa['inf'], $inf_ky)!==false) $inf_atk_per *= $value;
-			}	
+			}
 		}
 
 		# 计算社团技能对pa攻击力的修正（旧）
@@ -787,19 +871,31 @@ namespace revattr
 			$club_atk_per *= $attfac;
 		}*/
 
+		# 「枝火歌者」效果判定：基础攻击力增加
+		$fireseed_bonus = 0;
+		if($pa['club'] == 22 && !empty($pa['clbpara']['fireseed']))
+		{
+			include_once GAME_ROOT.'./include/game/club22.func.php';
+			// 传递当前计算出的基础攻击力（包含武器加成）
+			$fireseed_buff = FireseedBuffBonus($base_att, null);
+			$fireseed_bonus = $fireseed_buff['att'];
+			if(!$tooltip && $fireseed_bonus > 0) $log .= "<span class='yellow'>{$pa['nm']}的种火增幅了{$fireseed_bonus}点攻击力！</span><br>";
+		}
+
 		# 汇总
-		$base_att = round($base_att*($base_atk_per/100)*($inf_atk_per/100));
+		$base_att = round($base_att*($base_atk_per/100)*($inf_atk_per/100)) + $fireseed_bonus;
 		$base_att = max(1,$base_att);
 
 		if($tooltip)
 		{
 			$tooltip .= "天气修正：{$wth_atk_per}%\r 地点修正：{$pls_atk_per}%\r 姿态修正：{$pose_atk_per}%\r 策略修正：{$tac_atk_per}%";
+			if($fireseed_bonus > 0) $tooltip .=" \r 种火增幅：{$fireseed_bonus}";
 			if($inf_atk_per <> 100) $tooltip .=" \r 异常状态修正：{$inf_atk_per}%";
 			//if($club_atk_per <> 100) $tooltip .=" \r 称号技能修正：{$club_atk_per}%";
 			$tooltip .="\">".$base_att."</span>";
 			return $tooltip;
 		}
-		else 
+		else
 		{
 			return $base_att;
 		}
@@ -812,6 +908,15 @@ namespace revattr
 		if(!isset($pd['wep_kind'])) get_wep_kind($pd);
 		# pd基础防御力：
 		$base_def = $pd['def'];
+
+		# 「解放」技能判定：基础防御力增加
+		if(!empty($pd['clbpara']['skill']) && in_array('npc_wrelease', $pd['clbpara']['skill']) && !empty($pd['clbpara']['skillpara']['npc_wrelease']['active']))
+		{
+			$level = isset($pd['clbpara']['skillpara']['npc_wrelease']['level']) ? $pd['clbpara']['skillpara']['npc_wrelease']['level'] : 2;
+			$base_def *= $level;
+			if(!$tooltip) $log .= "<span class='yellow'>{$pa['nm']}进行了野生解放，基础防御力增加了{$level}倍！</span><br>";
+		}
+
 		# pd装备提供防御力：
 		$equip_def = $pd['arbe']+$pd['arhe']+$pd['arae']+$pd['arfe'];
 		# 是否受pa冲击效果影响：
@@ -868,8 +973,8 @@ namespace revattr
 		$base_def_per = 100;
 		//天气修正
 		$wth_def_per = isset($weather_defend_modifier[$weather]) ? $weather_defend_modifier[$weather] : 0 ;
-		//地点修正		
-		$pls_def_per = isset($pls_defend_modifier[$pd['pls']]) ? $pls_defend_modifier[$pd['pls']] : 0; 
+		//地点修正
+		$pls_def_per = isset($pls_defend_modifier[$pd['pls']]) ? $pls_defend_modifier[$pd['pls']] : 0;
 		//姿态修正只在受到先制攻击时生效？ //pa身上没有反击标记 代表这是一次先制攻击
 		if(!isset($pa['is_counter']) && $pose_defend_active) $pose_def_per = isset($pose_defend_modifier[$pd['pose']]) ? $pose_defend_modifier[$pd['pose']] : 0 ;
 		//姿态修正始终生效
@@ -881,34 +986,46 @@ namespace revattr
 		//上述各项系数修正最低不低于1%
 		$base_def_per += $wth_def_per+$pls_def_per+$pose_def_per+$tac_def_per;
 		$base_def_per = $base_def_per > 0 ? $base_def_per : 1;
-		
+
 		# 计算受伤状态对pd防御力的修正
 		$inf_def_per = 100;
 		if(!empty($pd['inf']))
 		{
 			global $inf_def_p;
-			foreach($inf_def_p as $inf_ky => $value) 
+			foreach($inf_def_p as $inf_ky => $value)
 			{
 				if(strpos($pd['inf'], $inf_ky)!==false) $inf_def_per *= $value;
 			}
 		}
-		
-		# 计算社团技能对pd防御力的修正（新）	
+
+		# 计算社团技能对pd防御力的修正（新）
 		#「根性」技能加成
 		if(!check_skill_unlock('c12_garrison',$pd))
 		{
 			$sk_lvl = get_skilllvl('c12_garrison',$pd);
 			$sk_var = 100+round(get_skillvars('c12_garrison','defgain',$sk_lvl) * calc_garrison_losshpr($pa,$pd));
 		}
+		# 「枝火歌者」效果判定：基础防御力增加
+		$fireseed_bonus = 0;
+		if($pd['club'] == 22 && !empty($pd['clbpara']['fireseed']))
+		{
+			include_once GAME_ROOT.'./include/game/club22.func.php';
+			// 传递当前计算出的基础防御力（包含装备加成）
+			$fireseed_buff = FireseedBuffBonus(null, $total_def);
+			$fireseed_bonus = $fireseed_buff['def'];
+			if(!$tooltip && $fireseed_bonus > 0) $log .= "<span class='yellow'>{$pd['nm']}的种火增幅了{$fireseed_bonus}点防御力！</span><br>";
+		}
+
 		# 汇总
 		$total_def = round($total_def*($base_def_per/100)*($inf_def_per/100));
 		if(isset($sk_var)) $total_def = round($total_def*($sk_var/100));
-		$total_def = max(0.01,$total_def);
+		$total_def = max(0.01,$total_def) + $fireseed_bonus;
 
 		if($tooltip)
 		{
 			$tooltip .= "天气修正：{$wth_def_per}% \r 地点修正：{$pls_def_per}% \r 姿态修正：{$pose_def_per}% \r 策略修正：{$tac_def_per}%";
 			if($inf_def_per <> 100) $tooltip .=" \r 异常状态修正：{$inf_def_per}%";
+			if($fireseed_bonus > 0) $tooltip .=" \r 种火增幅：{$fireseed_bonus}";
 			//if($club_def_per <> 100) $tooltip .=" \r 称号技能修正：{$club_def_per}%";
 			if(isset($sk_var)) $tooltip .=" \r 技能修正：".($sk_var-100)."%";
 			$tooltip .="\">".$total_def."</span>";
@@ -921,7 +1038,7 @@ namespace revattr
 	}
 
 	//计算原始伤害
-	function get_original_dmg_rev(&$pa,&$pd,$active) 
+	function get_original_dmg_rev(&$pa,&$pd,$active)
 	{
 		global $skill_dmg, $dmg_fluc, $weather, $pls, $log;
 
@@ -955,16 +1072,16 @@ namespace revattr
 
 		$damage = 0;
 		# 重枪
-		if ($pa['wep_kind'] == 'J') 
+		if ($pa['wep_kind'] == 'J')
 		{
 			$adddamage=$pd['mhp']/3;
 			if ($adddamage>20000) $adddamage=10000;
 			$damage += round($pa['wepe']*2/3+$adddamage);
 		}
 		# 灵力武器
-		if ($pa['wep_kind'] == 'F') 
+		if ($pa['wep_kind'] == 'F')
 		{
-			if(isset($pa['sldr_flag']) || isset($pd['sldr_flag'])) 
+			if(isset($pa['sldr_flag']) || isset($pd['sldr_flag']))
 			{
 				$log.="<span class=\"red\">由于灵魂抽取的作用，灵系武器伤害大幅降低了！</span><br>";
 			}
@@ -986,7 +1103,7 @@ namespace revattr
 	}
 
 	//计算伤害倍率变化（攻击方）
-	function get_damage_p_rev(&$pa,&$pd,$active) 
+	function get_damage_p_rev(&$pa,&$pd,$active)
 	{
 		global $log,$cskills;
 
@@ -1019,14 +1136,14 @@ namespace revattr
 				$log_sp_cost = ceil($sp_cost);
 				$log .= "消耗{$log_sp_cost}点体力，";
 			}
-			else 
+			else
 			{
 				$sp_cost = 0;
 			}
 			//获取威力系数：NPC固定为50%
 			$factor = $pa['type'] ? 0.5 : 0.5+round(($sp_cost/$sp_cost_max)/2,1);
 			//获取伤害变化倍率并扣除体力
-			$dmg_p[]= round($factor,2); 
+			$dmg_p[]= round($factor,2);
 			if(isset($log_sp_cost)) $pa['sp'] -= $log_sp_cost;
 			//输出log
 			$f = round ( 100 * $factor );
@@ -1038,7 +1155,7 @@ namespace revattr
 		{
 			//获取伤害变化倍率
 			$sk_r = get_skillvars('c9_lb','phydmgr');
-			$dmg_p[]= $sk_r; 
+			$dmg_p[]= $sk_r;
 			//输出log
 			if($pa['type']) $log .= npc_chat_rev ($pa,$pd,'critical');
 			$log .= "<span class=\"red\">发动必杀技！</span><br>";
@@ -1047,11 +1164,11 @@ namespace revattr
 		# 连击判定：
 		# 只要命中次数上限大于1就进入连击判定，不需要再检查武器有没有连击属性。方便一些技能强制附加连击
 		if($pa['hitrate_max_times'] > 1)
-		{	
+		{
 			//获取连击次数伤害倍率：2次2倍，3次2.8倍，之后=2.8+(次数-3)*0.6
 			$r_dmg_p = Array(2=>2,3=>2.8);
 			$p = isset($r_dmg_p[$pa['hitrate_times']]) ? $r_dmg_p[$pa['hitrate_times']] : 2.8 + ($pa['hitrate_times']-3)*0.6;
-			$dmg_p[]= $p; 
+			$dmg_p[]= $p;
 			//输出log
 			$log .= "{$pa['hitrate_max_times']}次连续攻击命中<span class=\"yellow\">{$pa['hitrate_times']}</span>次！";
 		}
@@ -1063,7 +1180,7 @@ namespace revattr
 			$sk_lvl = get_skilllvl('c1_crit',$pa);
 			// 获取猛击倍率
 			$sk_p = 1 + (get_skillvars('c1_crit','attgain',$sk_lvl) / 100);
-			$dmg_p[]= $sk_p; 
+			$dmg_p[]= $sk_p;
 			//输出log
 			$log .= "<span class=\"yellow\">{$pa['nm']}朝着{$pd['nm']}打出了凶猛的一击！<span class=\"clan\">{$pd['nm']}被打晕了过去！</span></span><br>";
 		}
@@ -1072,7 +1189,7 @@ namespace revattr
 		{
 			$sk_p = get_skillvars('c3_potential','phydmgr');
 			$p = 1 + ($sk_p / 100);
-			$dmg_p[]= $p; 
+			$dmg_p[]= $p;
 			$log.="<span class='yellow'>{$pa['nm']}爆发潜能打出了致命一击！</span><br>";
 		}
 		#「百出」判定：
@@ -1080,7 +1197,7 @@ namespace revattr
 		{
 			$sk_p = get_skillvars('c3_numerous','dmgr')*get_skillpara('c3_enchant','active_t',$pa['clbpara']);
 			$p = 1 + ($sk_p / 100);
-			$dmg_p[]= $p; 
+			$dmg_p[]= $p;
 			$log.="<span class='yellow'>{$pa['nm']}打得{$pd['nm']}落花流水，物理伤害增加了{$sk_p}%！</span><br>";
 		}
 		#「瞄准」判定：
@@ -1088,7 +1205,7 @@ namespace revattr
 		{
 			$sk_p = get_skillvars('c4_aiming','phydmgr');
 			$p = 1 + ($sk_p / 100);
-			$dmg_p[]= $p; 
+			$dmg_p[]= $p;
 			$log.="<span class='yellow'>「瞄准」使{$pa['nm']}造成的物理伤害提高了{$sk_p}%！</span><br>";
 		}
 		#「咆哮」判定：
@@ -1096,7 +1213,7 @@ namespace revattr
 		{
 			$sk_p = get_skillvars('c4_roar','phydmgr');
 			$p = 1 + ($sk_p / 100);
-			$dmg_p[]= $p; 
+			$dmg_p[]= $p;
 			$log.="<span class='yellow'>「咆哮」使{$pa['nm']}造成的物理伤害提高了{$sk_p}%！</span><br>";
 		}
 		#「穿杨」判定：
@@ -1104,7 +1221,7 @@ namespace revattr
 		{
 			$sk_p = get_skillvars('c4_sniper','phydmgr');
 			$p = 1 + ($sk_p / 100);
-			$dmg_p[]= $p; 
+			$dmg_p[]= $p;
 			$log.="<span class='yellow'>「穿杨」使{$pa['nm']}造成的物理伤害提高了{$sk_p}%！</span><br>";
 		}
 		#「解构」判定：
@@ -1112,13 +1229,13 @@ namespace revattr
 		{
 			$sk_p = get_skillvars('c10_decons','phydmgr');
 			$p = 1 + ($sk_p / 100);
-			$dmg_p[]= $p; 
+			$dmg_p[]= $p;
 			$log.="<span class='yellow'>「解构」使{$pa['nm']}造成的物理伤害提高了{$sk_p}%！</span><br>";
 		}
 		#「妙手」判定：
 		if(isset($pa['bskill_tl_pickpocket']))
 		{
-			$dmg_p[]= 0; 
+			$dmg_p[]= 0;
 			$log.="<span class='yellow'>「妙手」使{$pa['nm']}的本次攻击几乎没有造成任何伤害！</span><br>";
 		}
 		#「宗师」判定：
@@ -1126,7 +1243,7 @@ namespace revattr
 		{
 			$sk_p = (strpos($pa['wep_name'],'拳')!==false && $pa['wep_kind'] == 'P') ? get_skillvars('c13_master','phydmgloss_2') : get_skillvars('c13_master','phydmgloss');
 			$p = 1 - ($sk_p / 100);
-			$dmg_p[]= $p; 
+			$dmg_p[]= $p;
 			$log.="<span class='yellow'>{$pa['nm']}耻于使用武器战斗！造成的物理伤害降低了{$sk_p}%！</span><br>";
 		}
 
@@ -1180,7 +1297,7 @@ namespace revattr
 					unset($pd['phy_def_flag']);
 				}
 			}
-			else 
+			else
 			{
 				$log .="纳尼？{$pd['nm']}的装备使攻击无效化的属性竟然失效了！<br>";
 			}
@@ -1201,7 +1318,7 @@ namespace revattr
 			{
 				$pd['phy_def_flag'] =  1;
 			}
-			else 
+			else
 			{
 				$log .= "{$pd['nm']}的装备没能发挥减半伤害的效果！<br>";
 			}
@@ -1221,14 +1338,14 @@ namespace revattr
 			{
 				$pd['phy_def_flag'] = $def_kind[$pa['wep_kind']];
 			}
-			else 
+			else
 			{
 				$log .= "{$pd['nm']}的{$itemspkinfo[$def_kind[$pa['wep_kind']]]}没能发挥减半伤害的效果！<br>";
 			}
 		}
 
 		# 贯穿效果判定：
-		if(in_array('n',$pa['ex_keys'])) 
+		if(in_array('n',$pa['ex_keys']))
 		{
 			$dice = diceroll(99);
 			# 未贯穿率
@@ -1283,7 +1400,7 @@ namespace revattr
 		{
 			//获取伤害变化倍率并扣除体力
 			$p = 1.5;
-			$dmg_p[]= $p; 
+			$dmg_p[]= $p;
 			//输出log
 			$log.="<span class=\"red\">由于{$pd['nm']}手中的武器过于笨重，受到的伤害大增！真是大快人心啊！</span><br>";
 		}
@@ -1291,20 +1408,20 @@ namespace revattr
 		# 热恋、同志判定：
 		if(in_array('l',$pd['ex_keys']))
 		{
-			
+
 			$dice = diceroll(100);
 			if($dice <= 25)
 			{
 				if($pa['gd'] != $pd['gd'])
-				{	
+				{
 					$p = 0;
-					$dmg_p[]= $p; 
+					$dmg_p[]= $p;
 					$log .= "<span class=\"red\">{$pa['nm']}被{$pd['nm']}迷惑，无法全力攻击！</span>";
 				}
-				else 
+				else
 				{
 					$p = 2;
-					$dmg_p[]= $p; 
+					$dmg_p[]= $p;
 					$log .= "<span class=\"red\">{$pa['nm']}被{$pd['nm']}激怒，伤害加倍！</span>";
 				}
 			}
@@ -1315,15 +1432,15 @@ namespace revattr
 			if($dice <= 25)
 			{
 				if($pa['gd'] == $pd['gd'])
-				{	
+				{
 					$p = 0;
-					$dmg_p[]= $p; 
+					$dmg_p[]= $p;
 					$log .= "<span class=\"red\">{$pa['nm']}被{$pd['nm']}迷惑，无法全力攻击！</span>";
 				}
-				else 
+				else
 				{
 					$p = 2;
-					$dmg_p[]= $p; 
+					$dmg_p[]= $p;
 					$log .= "<span class=\"red\">{$pa['nm']}被{$pd['nm']}激怒，伤害加倍！</span>";
 				}
 			}
@@ -1338,12 +1455,12 @@ namespace revattr
 				$p = 0;
 				$log .= "<span class=\"red\">{$pa['nm']}的攻击完全被{$pd['nm']}的装备吸收了！</span><br>";
 			}
-			else 
+			else
 			{
 				$p = 0.5;
 				$log .= "<span class=\"yellow\">{$pd['nm']}的装备使{$pa['nm']}的攻击伤害减半了！</span><br>";
 			}
-			$dmg_p[]= $p; 
+			$dmg_p[]= $p;
 		}
 
 		return $dmg_p;
@@ -1408,7 +1525,7 @@ namespace revattr
 			if(in_array($ex,$ex_attack))
 			{
 				//把$ex_attack和$pa['ex_keys']位置调换可过滤重复属性，现在不会过滤
-				$ex_keys[]= $ex; 
+				$ex_keys[]= $ex;
 			}
 		}
 
@@ -1535,7 +1652,7 @@ namespace revattr
 					unset($pd['ex_def_flag'] );
 				}
 			}
-			else 
+			else
 			{
 				$log .="纳尼？{$pd['nm']}装备上使属性攻击无效化的属性竟然失效了！<br>"; //无效化属性攻击的属性无效化了 怎么会这样
 			}
@@ -1553,7 +1670,7 @@ namespace revattr
 			{
 				$pd['ex_def_flag'] =  1;
 			}
-			else 
+			else
 			{
 				$log .= "属性防御装备没能发挥应有的作用！<br>";
 			}
@@ -1578,7 +1695,7 @@ namespace revattr
 			if(isset($invaild_ex))
 			{
 				$ivlog = '';
-				foreach($invaild_ex as $ivex) 
+				foreach($invaild_ex as $ivex)
 				{
 					if(!empty($ivlog)) $ivlog.="、".$itemspkinfo[$ex_def_kind[$ivex]];
 					else $ivlog = $itemspkinfo[$ex_def_kind[$ivex]];
@@ -1588,14 +1705,14 @@ namespace revattr
 		}
 
 		# 破格（属穿）效果判断：
-		if(in_array('y',$pa['ex_keys'])) 
+		if(in_array('y',$pa['ex_keys']))
 		{
 			$dice = diceroll(99);
 			# 未破格率
 			$obbs = 100 - $specialrate['y'];
 			# 「暗杀」效果判定：
 			if(isset($pa['skill_buff_assassin'])) $obbs += get_skillvars('buff_assassin','pdefbkr');
-			if ($dice > $obbs) 
+			if ($dice > $obbs)
 			{
 				if(!empty($pd['ex_def_flag']))
 				{
@@ -1620,7 +1737,7 @@ namespace revattr
 	{
 		global $log,$now;
 		//触发了属抹效果，直接返回固定伤害值
-		if(isset($pd['ex_def_flag']) && $pd['ex_def_flag'] == 2) 
+		if(isset($pd['ex_def_flag']) && $pd['ex_def_flag'] == 2)
 		{
 			$total_ex_dmg = count($pa['ex_attack_keys']);
 			$log .= "<span class=\"red\">属性攻击的力量完全被防具吸收了！</span>仅造成了<span class=\"red\">{$total_ex_dmg}</span>点伤害！<br>";
@@ -1660,7 +1777,7 @@ namespace revattr
 					lostclubskill('buff_shield',$pd['clbpara']);
 					$pa['ex_breakshield_log'] = 1;
 				}
-				else 
+				else
 				{
 					$shield -= $ex_dmg;
 					$ex_dmg = 0;
@@ -1679,14 +1796,14 @@ namespace revattr
 				//获取属性施加异常概率的社团修正
 				if(isset($ex_good_club[$ex]) && $ex_good_club[$ex] == $pd['club']) $e_htr += 20;
 				//施加异常
-				if ($dice < $e_htr) 
+				if ($dice < $e_htr)
 				{
 					$pa['ex_dmginf_log'] = $ex_inf[$ex];
 					$pd['inf'] .= $pa['ex_dmginf_log'];
 					addnews($now,'inf',$pa['name'],$pd['name'],$pa['ex_dmginf_log']);
 				}
 			}
-			//整理后统一输出文本	
+			//整理后统一输出文本
 			if(!empty($pa['ex_dmgpsh_log'])) $log .= $pa['ex_dmgpsh_log'];	//由于对方已经xx xx伤害提升/降低
 			$log .= $exdmgname[$ex]; //xx
 			if($ex_dmg)
@@ -1699,7 +1816,7 @@ namespace revattr
 				if(!empty($pa['ex_breakshield_log'])) $log .= "<span class='red'>{$pd['nm']}的「护盾」被打破了！</span><br>";
 				$total_ex_dmg[] = $ex_dmg;
 			}
-			else 
+			else
 			{
 				if(!empty($pa['ex_shield_log'])) $log .= "被「护盾」抵消了！";
 				$log .= "没能造成伤害！<br>";
@@ -1720,7 +1837,7 @@ namespace revattr
 			//获取倍率
 			$sk_p = get_skillvars('c4_roar','exdmgr');
 			$p = 1 + ($sk_p / 100);
-			$ex_dmg_p[]= $p; 
+			$ex_dmg_p[]= $p;
 			//输出log
 			$log.="<span class='yellow'>「咆哮」使{$pa['nm']}造成的属性伤害提高了{$sk_p}%！</span><br>";
 		}
@@ -1732,7 +1849,7 @@ namespace revattr
 			if(!empty($sk_p))
 			{
 				$p = 1 + ($sk_p / 100);
-				$ex_dmg_p[]= $p; 
+				$ex_dmg_p[]= $p;
 			}
 		}
 		# 「催化」判定：
@@ -1743,7 +1860,7 @@ namespace revattr
 			{
 				$sk_p = get_skillvars('c8_catalyst','exdmgr')*$sk_nums;
 				$p = 1 + ($sk_p / 100);
-				$ex_dmg_p[]= $p; 
+				$ex_dmg_p[]= $p;
 				$log.="<span class='yellow'>「催化」使{$pa['nm']}造成的属性伤害提高了{$sk_p}%！</span><br>";
 			}
 		}
@@ -1755,6 +1872,37 @@ namespace revattr
 	{
 		global $log;
 		$fin_dmg_p = Array();
+
+		# 「种火I」效果判定：
+		if(isset($pd['skill_fireseed1']))
+		{
+			$p = 0.75;
+			$log.= "<span class='yellow'>「种火I」使{$pd['nm']}受到的最终伤害降低为75%！</span><br>";
+			$fin_dmg_p[] = $p;
+		}
+
+		# 「种火II」效果判定：
+		if(isset($pd['skill_fireseed2']))
+		{
+			$p = 0.5;
+			$log.= "<span class='yellow'>「种火II」使{$pd['nm']}受到的最终伤害降低为50%！</span><br>";
+			$fin_dmg_p[] = $p;
+		}
+
+		# 「种火IV」效果判定：
+		if(isset($pd['skill_fireseed4']))
+		{
+			// 将伤害设为0的特殊处理
+			$pd['fireseed4_flag'] = 1;
+			$log.= "<span class='yellow'>「种火IV」使{$pd['nm']}受到的所有伤害变为0！</span><br>";
+		}
+		# 「种火III」效果判定：
+		elseif(isset($pd['skill_fireseed3']))
+		{
+			// 将伤害设为1的特殊处理
+			$pd['fireseed3_flag'] = 1;
+			$log.= "<span class='yellow'>「种火III」使{$pd['nm']}受到的最终伤害变为1！</span><br>";
+		}
 
 		# 「强袭」效果判定：
 		if(isset($pa['bskill_c2_raiding']))
@@ -1827,7 +1975,7 @@ namespace revattr
 		if($pd['type'] == 89 && ($pd['name'] == '高中生·白神' || $pd['name'] == '白神·讨价还价'))
 		{
 			$p = attr_extra_89_bookworm($pa,$pd,$active,'defend');
-			if($p>0) $fin_dmg_p[]= $p; 
+			if($p>0) $fin_dmg_p[]= $p;
 		}
 
 		# 「莹心」pa效果判定：
@@ -1892,6 +2040,53 @@ namespace revattr
 	{
 		global $log,$plsinfo,$now;
 
+		# RuleSet钩子：规则集机制伤害/免伤优先于通常的最终伤害覆盖。
+		# RuleSet hook: ruleset execution/immunity mechanics precede ordinary final-damage overrides.
+		if(function_exists('ruleset_final_damage_fix_hook'))
+		{
+			$ruleset_final_damage = ruleset_final_damage_fix_hook($pa,$pd,$active,$fin_dmg);
+			if($ruleset_final_damage !== NULL) return $ruleset_final_damage;
+		}
+
+		# 「种火IV」效果判定：
+		if(isset($pd['fireseed4_flag']))
+		{
+			$fin_dmg = 0;
+			return $fin_dmg;
+		}
+		# 「种火III」效果判定：
+		if(isset($pd['fireseed3_flag']))
+		{
+			$fin_dmg = 1;
+			return $fin_dmg;
+		}
+
+		# 「勇谍」效果判定：
+		if(!empty($pd['clbpara']['skill']) && in_array('npc_perfectspy', $pd['clbpara']['skill']) && $pd['hp'] > 200 && ($pd['hp'] - $fin_dmg) < 200)
+		{
+			$fin_dmg = $pd['hp'] - 200;
+			$log .= "<span class='yellow'>{$pd['nm']}身经百战的经验让其留了一口气脱出了战斗！</span><br>";
+			return $fin_dmg;
+		}
+
+		# 「奇机」效果判定：
+		if(isset($pd['skill_tl_2ndchance']) && $fin_dmg > $pd['hp'] && $pd['hp'] > 1)
+		{
+			$fin_dmg = $pd['hp'] - 1;
+			$log .= "<span class='yellow'>「奇机」使{$pd['nm']}在危险时刻保留了1点生命值！</span><br>";
+			return $fin_dmg;
+		}
+
+		# 「起迹」效果判定：
+		if(isset($pd['skill_tl_oncemore']) && $pd['hp'] == 1 && !isset($pd['clbpara']['tl_oncemore_used']))
+		{
+			$pd['clbpara']['tl_oncemore_used'] = 1;
+			$fin_dmg = 0;
+			$log .= "<span class='yellow'>「起迹」使{$pd['nm']}在生命值为1时免疫了这次伤害！</span><br>";
+			return $fin_dmg;
+		}
+
+
 		# 「量心」效果判定 手加减：
 		if(isset($pa['askill_c19_dispel']) && $fin_dmg >= $pd['hp'])
 		{
@@ -1910,7 +2105,7 @@ namespace revattr
 				$log.="闷棍对体力不支的{$pd['nm']}造成了<span class=\"yellow\">{$sk_dmg}</span>点额外伤害！<br>";
 				$fin_dmg += $sk_dmg;
 			}
-			else 
+			else
 			{
 				$log.="闷棍没有造成额外伤害！<br>";
 			}
@@ -1948,14 +2143,14 @@ namespace revattr
 			$esum = 0;
 			$ssum = 0;
 			$sk_tot = '';
-			
+
 			if(!isset($data))
 			{
 				global $pdata;
 				$data = &$pdata;
 			}
 			extract($data,EXTR_REFS);
-				
+
 			//引爆身上的全部代码片段，并记录效耐和与属性
 			$log .= "{$pa['nm']}引爆了身上所有的代码片段！<br>";
 			foreach (array(1, 2, 3, 4, 5, 6) as $item_position)
@@ -1973,7 +2168,7 @@ namespace revattr
 				}
 			}
 			//对双方造成等同于这些片段上的异常状态
-			global $ex_inf, $exdmginf;				
+			global $ex_inf, $exdmginf;
 			$ex_inf_arr = '';
 			for ($i = 0; $i < mb_strlen($sk_tot); $i++)
 			{
@@ -1983,8 +2178,8 @@ namespace revattr
 					get_inf_rev($pd,$ex_inf[$sk_tot[$i]]);
 					$log .= "<span class='yellow'>爆炸的代码片段使双方{$exdmginf[$ex_inf[$sk_tot[$i]]]}了！</span><br>";
 				}
-			}		
-			
+			}
+
 			//特定系数：耐久和100以下是0.2，500以上是0.4，2500以上是0.6，10000以上是1.0，30000以上是2.0
 			if ($ssum < 100) $s_factor = 0.2;
 			elseif ($ssum < 500) $s_factor = 0.3;
@@ -1992,18 +2187,18 @@ namespace revattr
 			elseif ($ssum < 10000) $s_factor = 0.6;
 			elseif ($ssum < 30000) $s_factor = 1.0;
 			else $s_factor = 2.0;
-			
+
 			//对双方造成等同于这些片段上的效果和除以特定系数的额外伤害
 			if ($esum == 0) $blaster_dmg = 1;
 			else $blaster_dmg = (int)($esum / $s_factor);
 			$pa['hp'] -= $blaster_dmg;
 			if ($pa['hp'] <= 0)
 			{
-				$pa['hp'] = 0;				
+				$pa['hp'] = 0;
 				include_once GAME_ROOT . './include/state.func.php';
 				death('club21_blaster');
 			}
-			
+
 			//每受到100点伤害就随机炸伤对手身上一个部位
 			$hurt_times = min(floor($blaster_dmg/$dmgrate), 4);
 			$hurts = array('b','h','a','f');
@@ -2021,7 +2216,7 @@ namespace revattr
 					$log .= "<span class=\"yellow\">爆炸的代码片段使{$pd['nm']}{$exdmginf[$hurts[$key]]}了！</span><br>";
 				}
 			}
-			
+
 			$log .= "<span class=\"yellow\">爆炸的代码片段对双方造成了<span class=\"red\">$blaster_dmg</span>点额外伤害！</span><br>";
 			$fin_dmg += $blaster_dmg;
 		}
@@ -2035,14 +2230,14 @@ namespace revattr
 			# 「暗杀」效果判定
 			if(isset($pa['skill_buff_assassin'])) $obbs += get_skillvars('buff_assassin','pdefbkr');
 
-			if ($dice > $obbs) 
+			if ($dice > $obbs)
 			{
 				//贯穿与破格同时生效时 穿透伤害制御
 				if(isset($pa['ex_pierce_flag']) && isset($pa['pierce_flag']))
 				{
 					$log .= "<span class='gold'>{$pa['nm']}凌厉的攻势直接突破了{$pd['nm']}的伤害限制！</span><br>";
 				}
-				else 
+				else
 				{
 					#「脉冲」效果判定：
 					if(isset($pa['bskill_c7_emp']) || isset($pd['bskill_c7_emp']))
@@ -2073,7 +2268,7 @@ namespace revattr
 				$fin_dmg += $rp_dmg;
 				$log .= "<span class=\"yellow\">在「祛障」的作用下，{$pd['nm']}受到了<span class=\"red\">$rp_dmg</span>点额外伤害。</span><br>";
 			}
-			else 
+			else
 			{
 				$min_rp = get_skillvars('c19_redeem','rpmin');
 				$move_rp = max($min_rp,$pd['rp']);
@@ -2085,7 +2280,7 @@ namespace revattr
 		# 「狂怒」效果判定：
 		if(isset($pa['bskill_c12_rage']))
 		{
-			$sk_dmg = round($pa['mhp']*0.25); 
+			$sk_dmg = round($pa['mhp']*0.25);
 			$pa['hp'] -= $sk_dmg;
 			$sk_vars = get_skillvars('c12_enmity','findmgr',get_skilllvl('c12_enmity',$pa)) * calc_enmity_losshpr($pa,$pd);
 			if($sk_vars > 1) $sk_dmg = round($sk_dmg *(1 + ($sk_vars/100)));
@@ -2103,7 +2298,7 @@ namespace revattr
 			$fin_dmg += $pa['bskill_c20_lighting_white_dmg'];
 			$log .= "<span class='mtgcolorless'>{$elements_info[0]}使{$pa['nm']}的攻击附加了{$pa['bskill_c20_lighting_white_dmg']}点额外伤害！</span><br>";
 			unset($pa['bskill_c20_lighting_white_dmg']);
-		}				
+		}
 
 		# 「护盾」效果判定
 		if(isset($pd['skill_buff_shield']))
@@ -2137,7 +2332,7 @@ namespace revattr
 		# 「灵俑」抵挡伤害判定
 		if(!empty($pd['clbpara']['zombieid']))
 		{
-			$mate_list = $pd['clbpara']['zombieid']; 
+			$mate_list = $pd['clbpara']['zombieid'];
 			shuffle($mate_list);
 			foreach($mate_list as $mid)
 			{
@@ -2162,13 +2357,13 @@ namespace revattr
 		{
 			$sk = 'c20_sparkle';
 			unset($pa['askill_c20_sparkle']);
-			$plslist = get_safe_plslist(); 
+			$plslist = get_safe_plslist();
 			$sp_pls = $plslist[array_rand($plslist)];
 			# 注销技能状态
 			set_skillpara($sk,'active',0,$pd['clbpara']);
 			set_skillpara($sk,'active_t',1,$pd['clbpara']);
 			# 切换地图
-			$pd['pls'] = $sp_pls; 
+			$pd['pls'] = $sp_pls;
 			$pd['tp_by_sparkle'] = $sp_pls;
 			$log .= "<span class=\"yellow\">千钧一发之际，{$pd['nm']}点燃火花传送到了别处！</span><br>";
 			if(!$pa['type']) $pa['log_save'] .= "{$pd['name']}在千钧一发之际点燃了火花，传送到不知道哪去了！";
@@ -2230,7 +2425,7 @@ namespace revattr
 		global $log;
 
 		#计算反噬伤害：
-		if ($pa['final_damage'] >= 1000) 
+		if ($pa['final_damage'] >= 1000)
 		{
 			if ($pa['final_damage'] < 2000) {
 				$hp_d = floor($pa['hp']/2);
@@ -2239,7 +2434,7 @@ namespace revattr
 			} else {
 				$hp_d = floor($pa['hp']*4/5);
 			}
-			if (in_array('H',$pa['ex_keys'])) 
+			if (in_array('H',$pa['ex_keys']))
 			{
 				#「脉冲」效果判定：
 				if(isset($pa['bskill_c7_emp']) || isset($pd['bskill_c7_emp']))
@@ -2279,10 +2474,10 @@ namespace revattr
 	}
 
 	//防守方(pd)在受到伤害后触发的事件
-	function get_hurt_events(&$pa,&$pd,$active) 
+	function get_hurt_events(&$pa,&$pd,$active)
 	{
-		global $log,$infinfo,$exdmginf;
-		
+		global $log,$infinfo,$exdmginf,$db,$tablepre;
+
 		# pd存在防具受损况，在这里应用
 		if(!empty($pd['armor_hurt']))
 		{
@@ -2301,7 +2496,166 @@ namespace revattr
 
 		# 将pa造成的伤害记录在pd的成就里
 		if(!$pd['type'] && $pa['final_damage'] >= 1000000) $pd['clbpara']['achvars']['takedmg'] = $pa['final_damage'];
-		
+
+		# 「破虹」效果判定：
+		if(!empty($pd['clbpara']['skill']) && in_array('npc_overrainbow', $pd['clbpara']['skill']) && $pa['final_damage'] >= 1000)
+		{
+			// 进行d20暗骰
+			include_once GAME_ROOT.'./include/game/dice.func.php';
+			$dice_result = diceroll(20);
+
+			// 大成功（20）：不反弹伤害
+			if($dice_result == 20)
+			{
+				$log .= "<span class='minirainbow'>{$pd['nm']}发动了禁咒反「Over The Rainbow」！<br>七色的弹幕扑面而来！</span><br>";
+				$log .= "<span class='yellow'>但大概是因为奇迹保佑，七色弹幕被完全躲开了！</span><br>";
+			}
+			// 大失败（1）：伤害变为777.77倍
+			elseif($dice_result == 1)
+			{
+				$log .= "<span class='minirainbow'>{$pd['nm']}发动了禁咒反「Over The Rainbow」！<br>七色的弹幕扑面而来！</span><br>";
+				$log .= "<span class='minirainbow'>弹幕组成了真正意义上无缝的七色虹彩！</span><br>";
+
+				// 计算新伤害
+				$reflected_damage = round($pa['final_damage'] * 777.77);
+
+				// 对攻击者造成伤害
+				$pa['hp'] -= $reflected_damage;
+				if($pa['hp'] < 0) $pa['hp'] = 0;
+
+				$log .= "<span class='minirainbow'>{$pa['nm']}无法躲闪，被弹幕糊了一脸，受到了{$reflected_damage}点伤害！</span><br>";
+
+				// 处理攻击者被弹死
+				if($pa['hp'] <= 0)
+				{
+					include_once GAME_ROOT . './include/state.func.php';
+					death ( 'sdestruct' ); #暂时借用一下我头四物品的死法，反正蛮适合的
+				}
+
+				// 如果攻击者不是玩家，更新数据库
+				if($pa['type'])
+				{
+					$query = "UPDATE {$tablepre}players SET hp='{$pa['hp']}' WHERE pid='{$pa['pid']}'";
+					$db->query($query);
+				}
+			}
+			// 普通结果：反弹伤害
+			else
+			{
+				$log .= "<span class='minirainbow'>{$pd['nm']}发动了禁咒反「Over The Rainbow」！<br>七色的弹幕扑面而来！</span><br>";
+				$log .= "<span class='minirainbow'>{$pa['nm']}被卷入了{$pd['nm']}的弹幕之中！</span><br>";
+
+				// 对攻击者造成伤害
+				$pa['hp'] -= $pa['final_damage'];
+				if($pa['hp'] < 0) $pa['hp'] = 0;
+
+				$log .= "<span class='yellow'>{$pa['nm']}被弹幕击中，受到了{$pa['final_damage']}点伤害！</span><br>";
+
+				// 处理攻击者被弹死
+				if($pa['hp'] <= 0)
+				{
+					include_once GAME_ROOT . './include/state.func.php';
+					death ( 'sdestruct' ); #暂时借用一下我头四物品的死法，反正蛮适合的
+				}
+
+				// 如果攻击者不是玩家，更新数据库
+				if($pa['type'])
+				{
+					$query = "UPDATE {$tablepre}players SET hp='{$pa['hp']}' WHERE pid='{$pa['pid']}'";
+					$db->query($query);
+				}
+
+				// 防守者不受伤害
+				//$pd['hp'] += $pa['final_damage'];
+				//$pa['final_damage'] = 0;
+			}
+		}
+
+		# 核武器效果判定
+		if(!empty($pa['weppara']['isNuclearWeapon']))
+		{
+			// 计算伤害池
+			$damage_pool = $pa['final_damage'];
+			if(!empty($pa['clbpara']['randver1']))
+			{
+				if($pa['clbpara']['randver1'] == 128)
+				{
+					$damage_pool = $damage_pool * 7.77;
+				}
+				elseif($pa['clbpara']['randver1'] > 64)
+				{
+					$damage_pool = $damage_pool * 1.2;
+				}
+				else
+				{
+					$damage_pool = $damage_pool * 0.8;
+				}
+			}
+			else
+			{
+				$damage_pool = $damage_pool * 0.8; // 默认值
+			}
+
+			// 随机选择玩家数量
+			$player_count = rand(2, 22);
+
+			// 获取同一位置的玩家
+			$query = "SELECT * FROM {$tablepre}players WHERE pls='{$pa['pls']}' AND hp>0 AND pid<>'{$pa['pid']}' AND pid<>'{$pd['pid']}'";
+			$result = $db->query($query);
+			$players = array();
+			while($player = $db->fetch_array($result))
+			{
+				$players[] = $player;
+			}
+
+			// 将攻击者和防守者也加入列表
+			$players[] = $pa;
+			$players[] = $pd;
+
+			// 随机打乱玩家列表
+			shuffle($players);
+
+			// 限制玩家数量
+			$players = array_slice($players, 0, min($player_count, count($players)));
+
+			// 计算每个玩家受到的伤害
+			$damage_per_player = ceil($damage_pool / count($players));
+
+			$log .= "<span class='red'>{$pa['nm']}的核武器对区域内的所有人造成了伤害！</span><br>";
+
+			// 应用伤害
+			foreach($players as $player)
+			{
+				$actual_damage = $damage_per_player;
+
+				// 特殊条件检查
+				if(!empty($player['clbpara']['skill']) &&
+				   (in_array('fireseed3', $player['clbpara']['skill']) ||
+				    in_array('fireseed4', $player['clbpara']['skill'])) ||
+				   $player['def'] > 10000)
+				{
+					$actual_damage = 1;
+					$log .= "{$player['name']}受到了<span class='yellow'>1</span>点伤害！<br>";
+				}
+				else
+				{
+					// 生命值不能低于1
+					$new_hp = max(1, $player['hp'] - $actual_damage);
+					$actual_damage = $player['hp'] - $new_hp;
+					$player['hp'] = $new_hp;
+
+					$log .= "{$player['name']}受到了<span class='yellow'>{$actual_damage}</span>点伤害！<br>";
+
+					// 如果不是攻击者或防守者，更新数据库
+					if($player['pid'] != $pa['pid'] && $player['pid'] != $pd['pid'])
+					{
+						$query = "UPDATE {$tablepre}players SET hp='{$player['hp']}' WHERE pid='{$player['pid']}'";
+						$db->query($query);
+					}
+				}
+			}
+		}
+
 		return;
 	}
 
@@ -2313,8 +2667,8 @@ namespace revattr
 		if(strpos($pa['inf'],$infnm) === false)
 		{
 			$pa['inf'] .= $infnm;
-			//$pa['combat_inf'] .= $infnm;		
-			return 1;	
+			//$pa['combat_inf'] .= $infnm;
+			return 1;
 		}
 		return 0;
 	}
@@ -2335,8 +2689,8 @@ namespace revattr
 		if(strpos($pa['inf'],$infnm) !== false)
 		{
 			$pa['inf'] = str_replace($infnm,"",$pa['inf']);
-			//$pa['combat_inf'] .= $infnm;		
-			return 1;	
+			//$pa['combat_inf'] .= $infnm;
+			return 1;
 		}
 		return 0;
 	}
@@ -2373,7 +2727,7 @@ namespace revattr
 		{
 			$pa['clbpara']['battle_turns'] = 0;
 		}
-		else 
+		else
 		{
 			$pa['clbpara']['battle_turns'] ++;
 		}
@@ -2381,7 +2735,7 @@ namespace revattr
 		{
 			$pd['clbpara']['battle_turns'] = 0;
 		}
-		else 
+		else
 		{
 			$pd['clbpara']['battle_turns'] ++;
 		}

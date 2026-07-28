@@ -96,6 +96,31 @@
 	$salt = 'a29d8868b409591398e6ccca95f968ef';
 
 // ============================================================================
+// 主从数据库配置 (Master-Slave Database Configuration)
+// 以下配置项不能通过游戏后台修改，只能手动编辑或通过安装脚本配置
+
+	$slave_level = 0;				// 从服务器级别: -1=反向迁移模式(本地主→远端从), 0=主服务器, 1=从服务器(手动迁移), 2=从服务器(自动同步), 3=从服务器(直接使用主数据库)
+								// Slave level: -1=reverse migration(local master→remote slave), 0=master, 1=slave(manual migration), 2=slave(auto sync), 3=slave(direct master db)
+
+	$master_dbhost = '';			// 目标数据库服务器地址 (slave_level>0时为主数据库，slave_level=-1时为远端从数据库)
+								// Target database server (master db when slave_level>0, remote slave db when slave_level=-1)
+
+	$master_dbuser = '';			// 目标数据库用户名 (slave_level>0时为主数据库，slave_level=-1时为远端从数据库)
+								// Target database username (master db when slave_level>0, remote slave db when slave_level=-1)
+
+	$master_dbpw = '';			// 目标数据库密码 (slave_level>0时为主数据库，slave_level=-1时为远端从数据库)
+								// Target database password (master db when slave_level>0, remote slave db when slave_level=-1)
+
+	$master_dbname = '';			// 目标数据库名 (slave_level>0时为主数据库，slave_level=-1时为远端从数据库)
+								// Target database name (master db when slave_level>0, remote slave db when slave_level=-1)
+
+	$master_tablepre = '';			// 目标数据库表前缀 (slave_level>0时为主数据库，slave_level=-1时为远端从数据库)
+								// Target database table prefix (master db when slave_level>0, remote slave db when slave_level=-1)
+
+	$master_server_name = '';		// 目标服务器名称 (用于显示，slave_level>0时为主服务器，slave_level=-1时为远端从服务器)
+								// Target server name (for display, master server when slave_level>0, remote slave server when slave_level=-1)
+
+// ============================================================================
 
 
 ?>

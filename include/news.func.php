@@ -77,8 +77,18 @@ function  nparse_news($start = 0, $range = 0  ){//$type = '') {
 			unset($name);unset($nick);
 		}
 
+		# RuleSet钩子：在固定新闻分支前允许规则集提供完整HTML片段。
+		# RuleSet hook: allow a ruleset to provide a complete HTML fragment before built-in news formatting.
+		$ruleset_news_html = NULL;
+		if(function_exists('ruleset_format_news_hook'))
+		{
+			$ruleset_news_html = ruleset_format_news_hook($news,$time,$a,$b,$c,$d,$e);
+		}
+
 		//$sec='??';
-		if($news == 'newgame') {
+		if($ruleset_news_html !== NULL) {
+			$newsinfo .= $ruleset_news_html;
+		} elseif($news == 'newgame') {
 			$newsinfo .= "<li>{$hour}时{$min}分{$sec}秒，<span class=\"red\">第{$a}回ACFUN大逃杀开始了</span><br>\n";
 		} elseif($news == 'newroomgame') {
 			$newsinfo .= "<li>{$hour}时{$min}分{$sec}秒，<span class=\"red\">{$b}号房间内，第{$a}回ACFUN大逃杀开始了</span><br>\n";
@@ -173,7 +183,7 @@ function  nparse_news($start = 0, $range = 0  ){//$type = '') {
 				$newsinfo .= "<li>{$hour}时{$min}分{$sec}秒，<span class=\"yellow\">$a</span>被<span class=\"yellow\">$c</span>使用<span class=\"red\">{$d}</span>殴打致死";
 			} elseif($news == 'death22') {
 				$newsinfo .= "<li>{$hour}时{$min}分{$sec}秒，<span class=\"yellow\">$a</span>被<span class=\"yellow\">$c</span>使用<span class=\"red\">{$d}</span>斩杀";
-			} elseif($news == 'death23') {
+			} elseif($news == 'death23' || $news == 'death60') {
 				$newsinfo .= "<li>{$hour}时{$min}分{$sec}秒，<span class=\"yellow\">$a</span>被<span class=\"yellow\">$c</span>使用<span class=\"red\">{$d}</span>射杀";
 			} elseif($news == 'death24') {
 				$newsinfo .= "<li>{$hour}时{$min}分{$sec}秒，<span class=\"yellow\">$a</span>被<span class=\"yellow\">$c</span>投掷<span class=\"red\">{$d}</span>致死";
@@ -318,6 +328,8 @@ function  nparse_news($start = 0, $range = 0  ){//$type = '') {
 			$newsinfo .= "<li>{$hour}时{$min}分{$sec}秒，<span class=\"red\">{$a}的尸体被时空特使别动队销毁了</span><br>\n";
 		} elseif($news == 'cstick') {
 			$newsinfo .= "<li>{$hour}时{$min}分{$sec}秒，<span class=\"red\">{$a}把{$b}作为武器抡了起来！哇……这可真是……</span><br>\n";
+		} elseif($news == 'fireseed_recruit') {
+			$newsinfo .= "<li>{$hour}时{$min}分{$sec}秒，<span class=\"lime\">{$a}将{$b}收纳到了自己名下！</span><br>\n";
 		} elseif($news == 'editpc') {
 			$newsinfo .= "<li>{$hour}时{$min}分{$sec}秒，<span class=\"red\">{$a}遭到了黑幕的生化改造！</span><br>\n";
 		} elseif($news == 'suisidefail') {
@@ -359,6 +371,8 @@ function  nparse_news($start = 0, $range = 0  ){//$type = '') {
 			$newsinfo .= "<li>{$hour}时{$min}分{$sec}秒，$nword<br>\n";
 		} elseif($news == 'notworthit') {
 			$newsinfo .= "<li>{$hour}时{$min}分{$sec}秒，<span class=\"lime\">{$a}做出了一个他自己可能会后悔很长一段时间的决定。</span><br>\n";
+		} elseif($news == 'npcplatformusage') {
+			$newsinfo .= "<li>{$hour}时{$min}分{$sec}秒，<span class=\"lime\">{$a}决定化身成为全新的自我。</span><br>\n";
 		} elseif($news == 'present') {
 			$newsinfo .= "<li>{$hour}时{$min}分{$sec}秒，<span class=\"yellow\">{$a}打开了{$b}，获得了{$c}！</span><br>\n";
 		} elseif($news == 'emix_success') {

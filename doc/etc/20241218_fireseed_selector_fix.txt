@@ -1,0 +1,78 @@
+种火选择状态恢复问题修复 - 选择器查询问题
+时间：2024年12月18日
+
+## 问题描述
+
+用户反馈种火选择状态恢复仍然失败，调试信息显示了一个矛盾的情况：
+1. 选择框中确实存在种火440：`选项 3：440 ➤ 覆阳的薪火 (等级: 8, ID: 440)`
+2. clbpara中也确实存在种火440的完整数据
+3. 但恢复函数却报告"无法恢复选择状态，种火不存在: fireseed_item_id_panel = 440"
+
+## 根本原因分析
+
+问题不在于种火数据过滤或构建，而在于**选择器查询语法**：
+
+```javascript
+const option = select.querySelector(`option[value="${savedValue}"]`);
+```
+
+这个CSS选择器在某些情况下可能会失败，特别是：
+1. 当值包含特殊字符时
+2. 当值是纯数字时可能有引号问题
+3. CSS选择器的转义规则可能导致匹配失败
+
+## 修复方案
+
+将CSS选择器查询替换为更可靠的DOM遍历方法：
+
+### 修改前（第857-875行）：
+```javascript
+// 检查保存的值是否仍然存在于选项中
+const option = select.querySelector(`option[value="${savedValue}"]`);
+if (option) {
+    select.value = savedValue;
+    // ...
+} else {
+    console.log('无法恢复选择状态，种火不存在:', selectId, '=', savedValue);
+    // ...
+}
+```
+
+### 修改后（第857-883行）：
+```javascript
+// 检查保存的值是否仍然存在于选项中
+// 使用更可靠的方法查找选项，避免选择器语法问题
+let optionFound = false;
+for (let i = 0; i < select.options.length; i++) {
+    if (select.options[i].value === savedValue) {
+        optionFound = true;
+        break;
+    }
+}
+
+if (optionFound) {
+    select.value = savedValue;
+    console.log('恢复种火选择状态:', selectId, '=', savedValue);
+    // ...
+} else {
+    console.log('无法恢复选择状态，种火不存在:', selectId, '=', savedValue);
+    // ...
+}
+```
+
+## 修复优势
+
+1. **更可靠**：直接比较DOM元素的value属性，避免CSS选择器的转义问题
+2. **更直观**：代码逻辑更清晰，容易理解和调试
+3. **兼容性更好**：不依赖CSS选择器的复杂语法规则
+4. **性能稳定**：简单的循环比复杂的选择器查询更稳定
+
+## 预期效果
+
+这个修复应该能解决种火选择状态恢复失败的问题，让用户能够正常恢复之前选择的种火状态。
+
+## 测试建议
+
+1. 选择种火440，执行操作后刷新页面，检查是否能正确恢复选择
+2. 测试不同ID的种火，确保修复具有普遍性
+3. 检查控制台是否还有"无法恢复选择状态"的错误信息

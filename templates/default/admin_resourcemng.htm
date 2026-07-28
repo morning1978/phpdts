@@ -1,0 +1,144 @@
+<form method="post" name="resmng" action="admin.php" enctype="multipart/form-data">
+	<input type="hidden" name="mode" value="resourcemng">
+	<input type="hidden" name="start" value="$start">
+	<input type="hidden" name="record_id" id="record_id" value="$record_id">
+
+	<table class="admin" cellspacing="1" cellpadding="4">
+		<tr>
+			<td colspan="4" class="tdtitle">游戏资源管理</td>
+		</tr>
+		<tr>
+			<td>资源类型</td>
+			<td>
+				<select name="res_type">
+					<option value="mapitem" <!--{if $res_type=='mapitem'}-->selected<!--{/if}-->>地图物品</option>
+					<option value="shopitem" <!--{if $res_type=='shopitem'}-->selected<!--{/if}-->>商店物品</option>
+					<option value="stitem" <!--{if $res_type=='stitem'}-->selected<!--{/if}-->>开局物品</option>
+					<option value="stwep" <!--{if $res_type=='stwep'}-->selected<!--{/if}-->>开局武器</option>
+					<option value="npc" <!--{if $res_type=='npc'}-->selected<!--{/if}-->>开局NPC</option>
+				</select>
+			</td>
+			<td>配置来源</td>
+			<td>
+				<select name="ruleset">
+					<!--{loop $ruleset_list $rid $rinfo}-->
+					<option value="$rid" <!--{if $ruleset==$rid}-->selected<!--{/if}-->>$rinfo['name']</option>
+					<!--{/loop}-->
+				</select>
+				<input type="submit" name="action" value="list">
+			</td>
+		</tr>
+		<tr>
+			<td>搜索</td>
+			<td colspan="3">
+				<input type="text" name="keyword" value="$keyword_html" style="width:300px;">
+				<input type="submit" name="action" value="list">
+				<span class="yellow">$resultinfo</span>
+			</td>
+		</tr>
+		<tr>
+			<td>文件操作</td>
+			<td colspan="3">
+				<input type="submit" name="action" value="download">
+				<!--{if $allow_upload}-->
+				<input type="file" name="cfgfile">
+				<input type="submit" name="action" value="upload">
+				<!--{else}-->
+				<span class="grey">上传覆盖仅限管理员等级 &gt; 10</span>
+				<!--{/if}-->
+			</td>
+		</tr>
+	</table>
+
+	<br>
+
+	<!--{if $res_type!='npc'}-->
+	<table class="admin" cellspacing="1" cellpadding="4">
+		<tr>
+			<th>ID</th>
+			<!--{loop $columns $i $c}-->
+			<th>$c</th>
+			<!--{/loop}-->
+			<th>操作</th>
+		</tr>
+		<!--{loop $paged_records_html $idx $row}-->
+		<tr>
+			<td>$row['_idx']</td>
+			<!--{loop $columns $ci $c}-->
+			<td>$row[$ci]</td>
+			<!--{/loop}-->
+			<td>
+				<button type="submit" name="edit_id" value="$row['_idx']">编辑</button>
+				<button type="submit" name="delete_id" value="$row['_idx']" onclick="return confirm('确认删除该记录？');">删除</button>
+			</td>
+		</tr>
+		<!--{/loop}-->
+	</table>
+	<!--{else}-->
+	<table class="admin" cellspacing="1" cellpadding="4">
+		<tr>
+			<th>NPC类别</th>
+			<th>子键数量</th>
+			<th>操作</th>
+		</tr>
+		<!--{loop $paged_records_html $idx $row}-->
+		<tr>
+			<td>$row['_idx']</td>
+			<td>$row['_sub_count']</td>
+			<td>
+				<button type="submit" name="edit_id" value="$row['_idx']">编辑</button>
+				<button type="submit" name="delete_id" value="$row['_idx']" onclick="return confirm('确认删除该类别？');">删除</button>
+			</td>
+		</tr>
+		<!--{/loop}-->
+	</table>
+	<!--{/if}-->
+
+	<br>
+
+	<table class="admin" cellspacing="1" cellpadding="4">
+		<tr>
+			<td colspan="2" class="tdtitle">编辑/新增</td>
+		</tr>
+		<!--{if $res_type!='npc'}-->
+		<tr>
+			<td>ID</td>
+			<td><input type="text" name="record_id" value="$record_id"></td>
+		</tr>
+		<!--{loop $columns $i $c}-->
+		<tr>
+			<td>$c</td>
+			<td><input type="text" name="col_$i" style="width:98%;" value="{$edit_record_html[$i]}"></td>
+		</tr>
+		<!--{/loop}-->
+		<tr>
+			<td colspan="2">
+				<button type="submit" name="action" value="save_record">保存当前ID</button>
+				<button type="submit" name="action" value="add">新增记录</button>
+			</td>
+		</tr>
+		<!--{else}-->
+		<tr>
+			<td>NPC类别ID</td>
+			<td><input type="text" name="record_id" value="$record_id"></td>
+		</tr>
+		<tr>
+			<td>JSON配置</td>
+			<td>
+				<textarea name="npc_json" style="width:98%;height:260px;">$edit_record_json_html</textarea>
+			</td>
+		</tr>
+		<tr>
+			<td colspan="2">
+				<button type="submit" name="action" value="save_record">保存当前类别</button>
+				<button type="submit" name="action" value="add">新增类别</button>
+			</td>
+		</tr>
+		<!--{/if}-->
+	</table>
+
+	<div style="margin-top:8px;">
+		<button type="submit" name="pagemode" value="up">上一页</button>
+		<button type="submit" name="pagemode" value="down">下一页</button>
+	</div>
+</form>

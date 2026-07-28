@@ -9,6 +9,7 @@ namespace revbattle
 
 	include_once GAME_ROOT.'./include/game/revbattle.calc.php';
 	include_once GAME_ROOT.'./include/game/revcombat.func.php';
+	include_once GAME_ROOT.'./include/game/quest.func.php';
 
 	# 处理从界面传回的战斗相关指令，包含以下两种情况：
 	# 1.主动遇敌先制发现敌人；
@@ -60,6 +61,26 @@ namespace revbattle
 			findcorpse($edata);
 			return;
 		}
+		# QUEST专用战斗指令 / QUEST-specific battle command
+		$q7_battle_state = \quest_get_q7_battle_state($data, $edata);
+		if (!empty($q7_battle_state))
+		{
+			if ($command == 'quest_cheer')
+			{
+				$q7_result = \quest_handle_q7_cheer($command, $data, $edata);
+				if ($q7_result)
+				{
+					if ($q7_result == 1) findenemy_rev($edata);
+					return;
+				}
+			}
+			elseif ($command != 'back')
+			{
+				$log .= '<span class="yellow">对方正在等待你的应援，普通攻击并不合适。</span><br>';
+				findenemy_rev($edata);
+				return;
+			}
+		}
 		# 输入切换武器指令时，切换武器
 		if ($command == 'changewep') 
 		{
@@ -90,7 +111,11 @@ namespace revbattle
 		{
 			// 迎战视野中的敌人先制率-40
 			$active_r = min(4,calc_active_rate($data,$edata)-40);
-			$active_dice = diceroll(99);
+			// RuleSet钩子：被动容器在视野重遇时也必须由玩家先制。
+			// RuleSet hook: passive containers must also yield initiative on focus re-encounters.
+			$force_player_initiative = function_exists('ruleset_force_player_initiative_hook')
+				? ruleset_force_player_initiative_hook($edata,$data) : NULL;
+			$active_dice = $force_player_initiative ? ($active_r - 1) : diceroll(99);
 			if($active_dice < $active_r){
 				$action = 'enemy'; $bid = $edata['pid'];
 				findenemy_rev($edata);
@@ -194,7 +219,10 @@ namespace revbattle
 	{
 		global $db,$tablepre,$log,$mode,$main,$cmd,$battle_title,$attinfo,$skillinfo,$nosta,$cskills;
 		global $fog,$pdata;
-    global $battle_skills;
+		global $battle_skills, $quest_battle_mode, $quest_battle_state;
+
+		$quest_battle_mode = '';
+		$quest_battle_state = array();
 
 		//格式化双方clbpara
 		$edata['clbpara'] = get_clbpara($edata['clbpara']);
@@ -207,6 +235,10 @@ namespace revbattle
 		$log .= init_battle_log($pdata,$edata,$ismeet);
 		//初始化战斗界面
 		init_battle_rev($pdata,$edata,$ismeet);
+
+		// QUEST特殊战斗界面 / QUEST special battle UI
+		$quest_battle_state = \quest_get_q7_battle_state($pdata, $edata);
+		if (!empty($quest_battle_state)) $quest_battle_mode = 'Q7';
 
 		//检查是敌对或中立单位
 		$neut_flag = $edata['pose'] == 7 ? 1 : 0;
@@ -306,7 +338,7 @@ namespace revbattle
 	# 战斗中逃跑
 	function escape_from_enemy(&$pa,&$pd)
 	{
-		global $fog,$action,$clbpara,$chase_escape_obbs,$log;
+		global $fog,$action,$bid,$clbpara,$chase_escape_obbs,$log;
 		//include_once GAME_ROOT.'./include/game/dice.func.php';
 		# 在受追击/鏖战状态下逃跑有概率失败
 		if($action == 'pchase' || $action == 'dfight')

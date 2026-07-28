@@ -1,5 +1,5 @@
 <?php
-require __DIR__ . '/vendor/autoload.php';
+//require __DIR__ . '/vendor/autoload.php';
 error_reporting(E_ERROR | E_WARNING | E_PARSE);
 //set_magic_quotes_runtime(0);
 //ini_set('date.timezone','Asia/Shanghai');
@@ -245,6 +245,15 @@ if(!$action) {
 			$moveut = 0;
 			$gamefounder = 'admin';
 
+			// 主从配置默认值
+			$slave_level = 0;
+			$master_server_name = '';
+			$master_dbhost = '';
+			$master_dbuser = '';
+			$master_dbpw = '';
+			$master_dbname = '';
+			$master_tablepre = '';
+
 			@include './config.inc.php';
 			$now = time();
 			list($nowsec,$nowmin,$nowhour,$nowday,$nowmonth,$nowyear,$nowwday,$nowyday,$nowisdst) = localtime($now);
@@ -310,6 +319,51 @@ if(!$action) {
                   <td bgcolor="#E3E3EA">&nbsp;<?php echo $lang['gameurl']; ?></td>
                   <td bgcolor="#EEEEF6" align="center"><input type="text" name="gameurl" value="<?php echo $gameurl; ?>" size="30"></td>
                   <td bgcolor="#E3E3EA">&nbsp;<?php echo $lang['gameurl_comment']; ?></td>
+                </tr>
+                <tr>
+                  <td bgcolor="#E3E3EA" colspan="3" align="center" style="color: #FF0000; font-weight: bold;">主从数据库配置 (Master-Slave Database Configuration)</td>
+                </tr>
+                <tr>
+                  <td bgcolor="#E3E3EA">&nbsp;从服务器级别</td>
+                  <td bgcolor="#EEEEF6" align="center">
+                    <select name="slave_level" size="1">
+                      <option value="0"<?php echo (!isset($slave_level) || $slave_level == 0) ? ' selected' : ''; ?>>0 - 主服务器</option>
+                      <option value="1"<?php echo (isset($slave_level) && $slave_level == 1) ? ' selected' : ''; ?>>1 - 从服务器(手动迁移)</option>
+                      <option value="2"<?php echo (isset($slave_level) && $slave_level == 2) ? ' selected' : ''; ?>>2 - 从服务器(自动同步)</option>
+                      <option value="3"<?php echo (isset($slave_level) && $slave_level == 3) ? ' selected' : ''; ?>>3 - 从服务器(直接使用主数据库)</option>
+                    </select>
+                  </td>
+                  <td bgcolor="#E3E3EA">&nbsp;0=主服务器, 1=手动迁移, 2=自动同步, 3=直接使用主数据库</td>
+                </tr>
+                <tr>
+                  <td bgcolor="#E3E3EA">&nbsp;主服务器名称</td>
+                  <td bgcolor="#EEEEF6" align="center"><input type="text" name="master_server_name" value="<?php echo isset($master_server_name) ? $master_server_name : ''; ?>" size="30"></td>
+                  <td bgcolor="#E3E3EA">&nbsp;用于显示的主服务器名称</td>
+                </tr>
+                <tr>
+                  <td bgcolor="#E3E3EA">&nbsp;主数据库服务器</td>
+                  <td bgcolor="#EEEEF6" align="center"><input type="text" name="master_dbhost" value="<?php echo isset($master_dbhost) ? $master_dbhost : ''; ?>" size="30"></td>
+                  <td bgcolor="#E3E3EA">&nbsp;主数据库服务器地址 (仅从服务器需要)</td>
+                </tr>
+                <tr>
+                  <td bgcolor="#E3E3EA">&nbsp;主数据库用户名</td>
+                  <td bgcolor="#EEEEF6" align="center"><input type="text" name="master_dbuser" value="<?php echo isset($master_dbuser) ? $master_dbuser : ''; ?>" size="30"></td>
+                  <td bgcolor="#E3E3EA">&nbsp;主数据库用户名 (仅从服务器需要)</td>
+                </tr>
+                <tr>
+                  <td bgcolor="#E3E3EA">&nbsp;主数据库密码</td>
+                  <td bgcolor="#EEEEF6" align="center"><input type="password" name="master_dbpw" value="<?php echo isset($master_dbpw) ? $master_dbpw : ''; ?>" size="30"></td>
+                  <td bgcolor="#E3E3EA">&nbsp;主数据库密码 (仅从服务器需要)</td>
+                </tr>
+                <tr>
+                  <td bgcolor="#E3E3EA">&nbsp;主数据库名</td>
+                  <td bgcolor="#EEEEF6" align="center"><input type="text" name="master_dbname" value="<?php echo isset($master_dbname) ? $master_dbname : ''; ?>" size="30"></td>
+                  <td bgcolor="#E3E3EA">&nbsp;主数据库名 (仅从服务器需要)</td>
+                </tr>
+                <tr>
+                  <td bgcolor="#E3E3EA">&nbsp;主数据库表前缀</td>
+                  <td bgcolor="#EEEEF6" align="center"><input type="text" name="master_tablepre" value="<?php echo isset($master_tablepre) ? $master_tablepre : ''; ?>" size="30"></td>
+                  <td bgcolor="#E3E3EA">&nbsp;主数据库表前缀 (仅从服务器需要)</td>
                 </tr>
               </table>
               <br>
@@ -496,7 +550,17 @@ if(!$action) {
 				$bbsurl = setconfig($_POST['bbsurl']);
 				$gameurl = setconfig($_POST['gameurl']);
 				$moveut = (int)$_POST['moveut'];
-        $salt = bin2hex(random_bytes(16)); 
+
+				// 主从配置处理
+				$slave_level = (int)$_POST['slave_level'];
+				$master_server_name = setconfig($_POST['master_server_name']);
+				$master_dbhost = setconfig($_POST['master_dbhost']);
+				$master_dbuser = setconfig($_POST['master_dbuser']);
+				$master_dbpw = setconfig($_POST['master_dbpw']);
+				$master_dbname = setconfig($_POST['master_dbname']);
+				$master_tablepre = setconfig($_POST['master_tablepre']);
+
+        $salt = bin2hex(random_bytes(16));
 
 				$fp = fopen('./config.inc.php', 'r');
 				$configfile = fread($fp, filesize('./config.inc.php'));
@@ -511,6 +575,16 @@ if(!$action) {
 				$configfile = preg_replace("/[$]bbsurl\s*\=\s*[\"'].*?[\"'];/is", "\$bbsurl = '$bbsurl';", $configfile);
 				$configfile = preg_replace("/[$]gameurl\s*\=\s*[\"'].*?[\"'];/is", "\$gameurl = '$gameurl';", $configfile);
 				$configfile = preg_replace("/[$]moveut\s*\=\s*-?[0-9]+;/is", "\$moveut = $moveut;", $configfile);
+
+				// 主从配置更新
+				$configfile = preg_replace("/[$]slave_level\s*\=\s*-?[0-9]+;/is", "\$slave_level = $slave_level;", $configfile);
+				$configfile = preg_replace("/[$]master_server_name\s*\=\s*[\"'].*?[\"'];/is", "\$master_server_name = '$master_server_name';", $configfile);
+				$configfile = preg_replace("/[$]master_dbhost\s*\=\s*[\"'].*?[\"'];/is", "\$master_dbhost = '$master_dbhost';", $configfile);
+				$configfile = preg_replace("/[$]master_dbuser\s*\=\s*[\"'].*?[\"'];/is", "\$master_dbuser = '$master_dbuser';", $configfile);
+				$configfile = preg_replace("/[$]master_dbpw\s*\=\s*[\"'].*?[\"'];/is", "\$master_dbpw = '$master_dbpw';", $configfile);
+				$configfile = preg_replace("/[$]master_dbname\s*\=\s*[\"'].*?[\"'];/is", "\$master_dbname = '$master_dbname';", $configfile);
+				$configfile = preg_replace("/[$]master_tablepre\s*\=\s*[\"'].*?[\"'];/is", "\$master_tablepre = '$master_tablepre';", $configfile);
+
         $configfile = preg_replace("/[$]salt\s*\=\s*[\"'].*?[\"'];/is", "\$salt = '$salt';", $configfile);
     
 

@@ -1,0 +1,131 @@
+# 破虹（npc_overrainbow）技能实装
+
+## 功能概述
+
+实现了"破虹"（npc_overrainbow）技能，这是一个专为NPC设计的被动技能。当拥有该技能的NPC受到1000点以上的战斗伤害时，会进行一次d20暗骰，根据骰子结果决定是否反弹伤害给攻击者。
+
+## 实装内容
+
+1. 在 `gamedata/cache/clubskills_1.php` 文件中添加了 `npc_overrainbow` 技能的定义
+2. 在 `include/game/revattr.func.php` 文件的 `get_hurt_events` 函数中添加了破虹技能的处理逻辑
+
+## 实装细节
+
+### 1. 技能定义
+
+在 `clubskills_1.php` 文件中添加了以下技能定义：
+
+```php
+'npc_overrainbow' => Array
+(
+    'name' => '破虹',
+    'tags' => Array('passive'),
+    'desc' => '受到1000点以上的战斗伤害时进行一次d20暗骰，如不出大成功（20），则将该伤害反弹给对方目标。出大失败（1）的场合，该伤害额外成为777.77倍并输出额外文案。哪怕技能拥有者因为受到该伤害死亡，技能也照样结算。',
+),
+```
+
+### 2. 技能效果实现
+
+在 `revattr.func.php` 文件的 `get_hurt_events` 函数中添加了破虹技能的处理逻辑：
+
+1. **触发条件**：
+   - NPC拥有 `npc_overrainbow` 技能
+   - 受到的伤害大于等于1000点
+
+2. **骰子判定**：
+   - 使用 `diceroll(20)` 进行d20暗骰
+   - 根据骰子结果执行不同的效果
+
+3. **效果处理**：
+   - 大成功（20）：NPC正常承受伤害，不触发反弹效果
+   - 大失败（1）：伤害变为原伤害的777.77倍，并反弹给攻击者，同时显示特殊文案
+   - 普通结果（2-19）：将原伤害反弹给攻击者，NPC不受伤害
+
+4. **伤害处理**：
+   - 反弹伤害时，攻击者受到相应伤害
+   - 如果攻击者是NPC，更新数据库中的生命值
+   - 防守者（拥有破虹技能的NPC）在反弹伤害时不受伤害
+
+5. **特殊处理**：
+   - 即使NPC因为受到伤害而死亡，技能效果也会正常结算
+   - 大失败时会显示特殊的彩虹碎裂文案
+
+## 代码实现
+
+```php
+# 「破虹」效果判定：
+if(!empty($pd['clbpara']['skill']) && in_array('npc_overrainbow', $pd['clbpara']['skill']) && $pa['final_damage'] >= 1000)
+{
+    // 进行d20暗骰
+    include_once GAME_ROOT.'./include/game/dice.func.php';
+    $dice_result = diceroll(20);
+    
+    // 大成功（20）：不反弹伤害
+    if($dice_result == 20)
+    {
+        $log .= "<span class='yellow'>「破虹」技能触发！{$pd['nm']}进行了d20暗骰，结果为{$dice_result}（大成功）！</span><br>";
+        $log .= "<span class='yellow'>{$pd['nm']}承受了这次攻击的伤害。</span><br>";
+    }
+    // 大失败（1）：伤害变为777.77倍
+    elseif($dice_result == 1)
+    {
+        $log .= "<span class='red'>「破虹」技能触发！{$pd['nm']}进行了d20暗骰，结果为{$dice_result}（大失败）！</span><br>";
+        $log .= "<span class='red'>天空中突然出现了七色彩虹，随后彩虹碎裂，无数光花如雨般落下！</span><br>";
+        
+        // 计算新伤害
+        $reflected_damage = round($pa['final_damage'] * 777.77);
+        
+        // 对攻击者造成伤害
+        $pa['hp'] -= $reflected_damage;
+        if($pa['hp'] < 0) $pa['hp'] = 0;
+        
+        $log .= "<span class='red'>{$pa['nm']}被彩虹碎片击中，受到了{$reflected_damage}点伤害！</span><br>";
+        
+        // 如果攻击者不是玩家，更新数据库
+        if($pa['type'])
+        {
+            $query = "UPDATE {$tablepre}players SET hp='{$pa['hp']}' WHERE pid='{$pa['pid']}'";
+            $db->query($query);
+        }
+    }
+    // 普通结果：反弹伤害
+    else
+    {
+        $log .= "<span class='yellow'>「破虹」技能触发！{$pd['nm']}进行了d20暗骰，结果为{$dice_result}！</span><br>";
+        $log .= "<span class='yellow'>{$pd['nm']}将伤害反弹给了{$pa['nm']}！</span><br>";
+        
+        // 对攻击者造成伤害
+        $pa['hp'] -= $pa['final_damage'];
+        if($pa['hp'] < 0) $pa['hp'] = 0;
+        
+        $log .= "<span class='yellow'>{$pa['nm']}受到了{$pa['final_damage']}点伤害！</span><br>";
+        
+        // 如果攻击者不是玩家，更新数据库
+        if($pa['type'])
+        {
+            $query = "UPDATE {$tablepre}players SET hp='{$pa['hp']}' WHERE pid='{$pa['pid']}'";
+            $db->query($query);
+        }
+        
+        // 防守者不受伤害
+        $pd['hp'] += $pa['final_damage'];
+        $pa['final_damage'] = 0;
+    }
+}
+```
+
+## 使用方法
+
+1. 为NPC添加 `npc_overrainbow` 技能：
+   ```php
+   $npc['clbpara']['skill'][] = 'npc_overrainbow';
+   ```
+
+2. 当玩家攻击拥有该技能的NPC并造成1000点以上伤害时，会自动触发破虹技能效果
+
+## 注意事项
+
+1. 该技能专为NPC设计，玩家不应该获得此技能
+2. 技能效果会在NPC受到伤害后立即触发，即使NPC因为该伤害而死亡
+3. 大失败（1）时的777.77倍伤害可能会对玩家造成致命伤害，需要谨慎使用
+4. 该技能适合用于高难度BOSS或特殊NPC，增加游戏的挑战性和策略性

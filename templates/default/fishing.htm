@@ -1,0 +1,6 @@
+你正在{$plsinfo[$pls]}钓鱼，同时{$restinfo[$state]}中...<br>
+<span class="yellow">已钓到 {$fishing_count} 个物品</span><br>
+<input type="hidden" id="mode" name="mode" value="fishing">
+<input type="hidden" id="command" name="command" value="rest">
+<input type="button" class="cmdbutton" id="zz" name="rest" value="[Z]继续钓鱼" onclick="postCmd('gamecmd','command.php');this.disabled=true;">
+<input type="button" class="cmdbutton" id="x" name="back" value="[X]结束钓鱼" onclick="$('command').value='back';postCmd('gamecmd','command.php');this.disabled=true;">

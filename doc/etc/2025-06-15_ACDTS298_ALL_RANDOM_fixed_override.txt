@@ -1,0 +1,105 @@
+NOUVEAU DAY 68 - ACDTS298 ALL RANDOM RuleSet 覆盖系统修复记录
+时间：2025-06-15
+操作：修复RuleSet覆盖系统，解决文件冲突问题
+
+=== 问题分析 ===
+
+原始的文件物理替换方案存在严重问题：
+1. 文件冲突：多个房间同时使用不同RuleSet时，后初始化的房间会覆盖前面的文件
+2. 影响其他房间：普通房间和默认大房间会被迫使用最后一个RuleSet的文件
+3. 并发问题：多个房间同时初始化时可能导致文件状态不一致
+4. 扩展性差：未来如果有机制大改的RuleSet，会影响所有房间
+
+=== 新的解决方案 ===
+
+采用**基于函数钩子的动态覆盖系统**：
+
+1. 不再物理替换文件
+2. 在原始函数中添加RuleSet检测钩子
+3. 只在特定RuleSet房间中生效，不影响其他房间
+4. 通过函数检测当前房间的RuleSet类型
+
+=== 技术实现 ===
+
+1. **覆盖系统重构**
+   - 简化了 include/ruleset_override.func.php
+   - 移除了文件物理替换逻辑
+   - 添加了 get_current_ruleset_id() 和 is_all_random_mode() 函数
+
+2. **函数钩子添加**
+   - 在 include/game/itemmain.func.php 的 itemget() 函数中添加钩子
+   - 在 include/game/itemmix.func.php 的 itemmix_events() 函数中添加钩子
+   - 在 include/system.func.php 的地图物品刷新和NPC刷新逻辑中添加钩子
+
+3. **检测机制**
+   - 使用 function_exists('is_all_random_mode') && is_all_random_mode() 进行检测
+   - is_all_random_mode() 函数直接查询数据库获取当前房间的RuleSet信息
+   - 不依赖clbpara或其他可能不稳定的变量
+
+4. **随机化逻辑**
+   - 物品属性随机化：itme和itms在0到原数值的2~7倍之间随机，最小值为1
+   - 物品特殊属性随机化：从$itemspkinfo中随机选择1-3个属性组合
+   - 地图物品随机刷新：所有物品都随机刷新到任意地点（排除地点34）
+   - NPC随机刷新：所有NPC都随机刷新到任意地点（排除地点34）
+
+=== 修改的文件 ===
+
+1. **include/ruleset_override.func.php**
+   - 重构了整个覆盖系统
+   - 添加了 get_current_ruleset_id() 函数
+   - 添加了 is_all_random_mode() 函数
+   - 移除了文件物理替换逻辑
+
+2. **include/game/itemmain.func.php**
+   - 在 itemget() 函数开始处添加了RuleSet钩子
+   - 检测全随机模式并应用物品属性随机化
+
+3. **include/game/itemmix.func.php**
+   - 在 itemmix_events() 函数开始处添加了RuleSet钩子
+   - 检测全随机模式并应用合成物品属性随机化
+
+4. **include/system.func.php**
+   - 在地图物品刷新逻辑中添加了RuleSet钩子
+   - 在NPC刷新逻辑中添加了RuleSet钩子
+   - 检测全随机模式并应用位置随机化
+
+5. **include/common.inc.php**
+   - 添加了 load_ruleset_override_functions() 调用
+   - 确保覆盖函数在需要时被加载
+
+6. **gamedata/ruleset/ruleset_config.php**
+   - 清空了 override_modules 配置
+   - 保留了RuleSet的其他配置
+
+=== 删除的文件 ===
+
+移除了不再需要的覆盖文件：
+- gamedata/ruleset/ACDTS_298SP4_AR/include/system.func.php
+- gamedata/ruleset/ACDTS_298SP4_AR/include/game/itemmain.func.php
+- gamedata/ruleset/ACDTS_298SP4_AR/include/game/itemmix.func.php
+- gamedata/ruleset/ACDTS_298SP4_AR/include/game/item.giftbox.php
+- gamedata/ruleset/ACDTS_298SP4_AR/include/game/item.other.php
+- gamedata/ruleset/ACDTS_298SP4_AR/include/game/item.dice.php
+
+=== 优势 ===
+
+1. **无文件冲突**：不再物理替换文件，每个房间独立运行
+2. **向后兼容**：不影响其他RuleSet和普通房间
+3. **实时检测**：每次函数调用时都会检测当前房间的RuleSet
+4. **易于扩展**：可以轻松添加新的RuleSet特性
+5. **调试友好**：保留了调试信息和日志
+
+=== 测试要点 ===
+
+1. 验证ACDTS_298SP4_AR房间中的随机化功能是否正常
+2. 验证普通房间和其他RuleSet房间不受影响
+3. 验证多个不同RuleSet房间同时运行时的独立性
+4. 验证物品获得时的随机化提示信息
+5. 验证地图物品和NPC的随机刷新
+
+=== 注意事项 ===
+
+1. 钩子函数会在每次相关操作时执行，性能影响很小
+2. 数据库查询被缓存在函数内部，避免重复查询
+3. 随机化只在ACDTS_298SP4_AR房间中生效
+4. 保持了原有游戏逻辑的完整性

@@ -1,0 +1,311 @@
+<div id="fireseedpage" class="userdialog" style="display:none;width:800px;height:600px;">
+    <div class="dialog-title">种火管理</div>
+    <div class="dialog-content" style="overflow-y: auto; height: 520px;">
+        <div class="dialog-tab">
+            <div class="tab-header">
+                <div class="tab-button active" onclick="switchTab(this, 'fireseed-status')">种火状态</div>
+                <div class="tab-button" onclick="switchTab(this, 'fireseed-deploy')">种火部署</div>
+                <div class="tab-button" onclick="switchTab(this, 'fireseed-items')">种火物品</div>
+                <div class="tab-button" onclick="switchTab(this, 'fireseed-enhance')">种火强化</div>
+            </div>
+            <div class="tab-content">
+                <div id="fireseed-status" class="tab-pane active">
+                    <h3>种火状态</h3>
+                    <table class="fireseed-table">
+                        <tr>
+                            <th>名称</th>
+                            <th>等级</th>
+                            <th>状态</th>
+                            <th>位置</th>
+                            <th>生命</th>
+                            <th>体力</th>
+                            <th>攻击</th>
+                            <th>防御</th>
+                        </tr>
+                        <!--{if !empty($clbpara['fireseed'])}-->
+                        <!--{loop $clbpara['fireseed'] $fs_id $fs_data}-->
+                        <tr>
+                            <td><span class="yellow">$fs_data['name']</span></td>
+                            <td>$fs_data['level']</td>
+                            <td>$fireseed_deploy_modes[$fs_data['mode']]</td>
+                            <td>$plsinfo[$fs_data['pls']]</td>
+                            <td>$fs_data['hp']/$fs_data['mhp']</td>
+                            <td>$fs_data['sp']/$fs_data['msp']</td>
+                            <td>$fs_data['att']</td>
+                            <td>$fs_data['def']</td>
+                        </tr>
+                        <!--{/loop}-->
+                        <!--{else}-->
+                        <tr>
+                            <td colspan="8">你还没有收纳任何种火。</td>
+                        </tr>
+                        <!--{/if}-->
+                    </table>
+                </div>
+                <div id="fireseed-deploy" class="tab-pane">
+                    <h3>种火部署</h3>
+                    <form id="fireseed-deploy-form" method="post" action="command.php" target="cmd_window">
+                        <input type="hidden" name="mode" value="command">
+                        <input type="hidden" name="command" value="special">
+                        <input type="hidden" name="sp_cmd" value="sp_fireseed_deploy">
+                        
+                        <div class="form-group">
+                            <label for="fireseed_id">选择种火：</label>
+                            <select name="fireseed_id" id="fireseed_id">
+                                <!--{if !empty($clbpara['fireseed'])}-->
+                                <!--{loop $clbpara['fireseed'] $fs_id $fs_data}-->
+                                <option value="$fs_id">$fs_data['name'] (等级: $fs_data['level'])</option>
+                                <!--{/loop}-->
+                                <!--{else}-->
+                                <option value="">你还没有收纳任何种火</option>
+                                <!--{/if}-->
+                            </select>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="deploy_mode">部署模式：</label>
+                            <select name="deploy_mode" id="deploy_mode">
+                                <!--{loop $fireseed_deploy_modes $mode_id $mode_name}-->
+                                <option value="$mode_id">$mode_name</option>
+                                <!--{/loop}-->
+                            </select>
+                        </div>
+                        
+                        <div class="form-group" id="deploy-location-group">
+                            <label for="deploy_pls">部署位置：</label>
+                            <select name="deploy_pls" id="deploy_pls">
+                                <!--{loop $plsinfo $pls_id $pls_name}-->
+                                <!--{if $pls_id > 0}-->
+                                <option value="$pls_id" <!--{if $pls_id == $pls}-->selected<!--{/if}-->>$pls_name</option>
+                                <!--{/if}-->
+                                <!--{/loop}-->
+                            </select>
+                        </div>
+                        
+                        <div class="form-group">
+                            <input type="submit" class="cmdbutton" value="部署种火" onclick="postCmd('gamecmd','command.php');">
+                        </div>
+                    </form>
+                    
+                    <script>
+                        // 当部署模式改变时，显示或隐藏位置选择
+                        document.getElementById('deploy_mode').addEventListener('change', function() {
+                            var mode = this.value;
+                            var locationGroup = document.getElementById('deploy-location-group');
+                            if(mode == '0') { // 跟随模式
+                                locationGroup.style.display = 'none';
+                            } else {
+                                locationGroup.style.display = 'block';
+                            }
+                        });
+                    </script>
+                </div>
+                <div id="fireseed-items" class="tab-pane">
+                    <h3>种火物品</h3>
+                    <form id="fireseed-items-form" method="post" action="command.php" target="cmd_window">
+                        <input type="hidden" name="mode" value="command">
+                        <input type="hidden" name="command" value="special">
+                        <input type="hidden" name="sp_cmd" value="sp_fireseed_getitem">
+                        
+                        <div class="form-group">
+                            <label for="fireseed_item_id">选择种火：</label>
+                            <select name="fireseed_item_id" id="fireseed_item_id" onchange="updateFireseedItems(this.value)">
+                                <!--{if !empty($clbpara['fireseed'])}-->
+                                <!--{loop $clbpara['fireseed'] $fs_id $fs_data}-->
+                                <option value="$fs_id">$fs_data['name'] (等级: $fs_data['level'])</option>
+                                <!--{/loop}-->
+                                <!--{else}-->
+                                <option value="">你还没有收纳任何种火</option>
+                                <!--{/if}-->
+                            </select>
+                        </div>
+                        
+                        <div id="fireseed-items-list">
+                            <!--{if !empty($clbpara['fireseed'])}-->
+                            <!--{loop $clbpara['fireseed'] $fs_id $fs_data}-->
+                            <div class="fireseed-items" id="fireseed-items-$fs_id" style="display: none;">
+                                <!--{if !empty($fs_data['items'])}-->
+                                <table class="fireseed-table">
+                                    <tr>
+                                        <th>物品名称</th>
+                                        <th>类型</th>
+                                        <th>效果</th>
+                                        <th>数量</th>
+                                        <th>特殊</th>
+                                        <th>操作</th>
+                                    </tr>
+                                    <!--{loop $fs_data['items'] $item_id $item}-->
+                                    <tr>
+                                        <td>$item['itm']</td>
+                                        <td>$item['itmk']</td>
+                                        <td>$item['itme']</td>
+                                        <td>$item['itms']</td>
+                                        <td>$item['itmsk']</td>
+                                        <td>
+                                            <input type="radio" name="item_id" value="$item_id">
+                                        </td>
+                                    </tr>
+                                    <!--{/loop}-->
+                                </table>
+                                <input type="submit" class="cmdbutton" value="获取物品" onclick="postCmd('gamecmd','command.php');">
+                                <!--{else}-->
+                                <p>该种火没有收集到任何物品。</p>
+                                <!--{/if}-->
+                            </div>
+                            <!--{/loop}-->
+                            <!--{/if}-->
+                        </div>
+                    </form>
+                    
+                    <script>
+                        function updateFireseedItems(fsId) {
+                            // 隐藏所有种火物品列表
+                            var itemLists = document.querySelectorAll('.fireseed-items');
+                            for(var i = 0; i < itemLists.length; i++) {
+                                itemLists[i].style.display = 'none';
+                            }
+                            
+                            // 显示选中的种火物品列表
+                            var selectedList = document.getElementById('fireseed-items-' + fsId);
+                            if(selectedList) {
+                                selectedList.style.display = 'block';
+                            }
+                        }
+                        
+                        // 初始化显示第一个种火的物品
+                        var firstFireseed = document.getElementById('fireseed_item_id');
+                        if(firstFireseed && firstFireseed.value) {
+                            updateFireseedItems(firstFireseed.value);
+                        }
+                    </script>
+                </div>
+                <div id="fireseed-enhance" class="tab-pane">
+                    <h3>种火强化</h3>
+                    <form id="fireseed-enhance-form" method="post" action="command.php" target="cmd_window">
+                        <input type="hidden" name="mode" value="command">
+                        <input type="hidden" name="command" value="special">
+                        <input type="hidden" name="sp_cmd" value="sp_fireseed_enhance">
+                        
+                        <div class="form-group">
+                            <label for="enhance_fireseed_id">选择种火：</label>
+                            <select name="enhance_fireseed_id" id="enhance_fireseed_id">
+                                <!--{if !empty($clbpara['fireseed'])}-->
+                                <!--{loop $clbpara['fireseed'] $fs_id $fs_data}-->
+                                <option value="$fs_id">$fs_data['name'] (等级: $fs_data['level'])</option>
+                                <!--{/loop}-->
+                                <!--{else}-->
+                                <option value="">你还没有收纳任何种火</option>
+                                <!--{/if}-->
+                            </select>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="enhance_item">选择焰火物品：</label>
+                            <select name="enhance_item" id="enhance_item">
+                                <!--{for $i=1; $i<=6; $i++}-->
+                                <!--{if ${'itm'.$i} == '◆焰火' || ${'itm'.$i} == '✦烈焰火' || ${'itm'.$i} == '★华焰火★' || ${'itm'.$i} == '☾真焰火☽' || ${'itm'.$i} == '☼焰火☼'}-->
+                                <option value="$i">${'itm'.$i} (效果: ${'itme'.$i}, 数量: ${'itms'.$i})</option>
+                                <!--{/if}-->
+                                <!--{/for}-->
+                            </select>
+                        </div>
+                        
+                        <div class="form-group">
+                            <input type="submit" class="cmdbutton" value="强化种火" onclick="postCmd('gamecmd','command.php');">
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="dialog-footer">
+        <button class="cmdbutton" onclick="hideModalDialog($('fireseedpage'));">关闭</button>
+    </div>
+</div>
+
+<style>
+.fireseed-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 20px;
+}
+
+.fireseed-table th, .fireseed-table td {
+    border: 1px solid #ddd;
+    padding: 8px;
+    text-align: left;
+}
+
+.fireseed-table th {
+    background-color: #f2f2f2;
+}
+
+.dialog-tab .tab-header {
+    display: flex;
+    border-bottom: 1px solid #ddd;
+    margin-bottom: 15px;
+}
+
+.dialog-tab .tab-button {
+    padding: 10px 15px;
+    cursor: pointer;
+    background-color: #f2f2f2;
+    border: 1px solid #ddd;
+    border-bottom: none;
+    margin-right: 5px;
+}
+
+.dialog-tab .tab-button.active {
+    background-color: #fff;
+    border-bottom: 1px solid #fff;
+    margin-bottom: -1px;
+}
+
+.dialog-tab .tab-content {
+    padding: 15px;
+    border: 1px solid #ddd;
+    border-top: none;
+}
+
+.dialog-tab .tab-pane {
+    display: none;
+}
+
+.dialog-tab .tab-pane.active {
+    display: block;
+}
+
+.form-group {
+    margin-bottom: 15px;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 5px;
+}
+
+.form-group select, .form-group input[type="text"] {
+    width: 100%;
+    padding: 8px;
+    border: 1px solid #ddd;
+}
+</style>
+
+<script>
+function switchTab(button, tabId) {
+    // 移除所有标签页的活动状态
+    var tabButtons = document.querySelectorAll('.tab-button');
+    for(var i = 0; i < tabButtons.length; i++) {
+        tabButtons[i].classList.remove('active');
+    }
+    
+    var tabPanes = document.querySelectorAll('.tab-pane');
+    for(var i = 0; i < tabPanes.length; i++) {
+        tabPanes[i].classList.remove('active');
+    }
+    
+    // 设置当前标签页为活动状态
+    button.classList.add('active');
+    document.getElementById(tabId).classList.add('active');
+}
+</script>

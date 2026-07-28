@@ -1,0 +1,46 @@
+时间戳: 2024-12-15 14:30:00 (NOUVEAU DAY -114)
+操作: 修复ruleset房间创建权限检查问题
+
+问题描述:
+用户报告在局域网测试新的ruleset系统时，尝试创建ruleset房间时出现"没有权限创建该时光重现房间"错误。
+用户当前登录的groupid = 9（groupid大于2便为管理员用户），应该满足权限要求。
+
+分析过程:
+1. 检查了can_create_ruleset_room函数的实现，发现管理员权限检查条件是 $user_data['groupid'] >= 4
+2. 用户的groupid = 9，应该满足 >= 4 的条件
+3. 检查了$ruleset_enabled变量，在ruleset_config.php中设置为true
+4. 错误信息'ruleset_no_permission'对应"没有权限创建该时光重现房间"
+
+修复方案:
+在roommng_create_new_room函数中添加详细的调试信息，记录权限检查的各个步骤：
+- ruleset_id
+- user_groupid  
+- user_credits2
+- ruleset_enabled状态
+- 配置是否存在
+- admin_free设置
+- credits_cost设置
+- 管理员权限检查结果
+- 切糕数量检查结果
+
+修改文件:
+- include/roommng.func.php (第85-93行 -> 第85-115行)
+- gamedata/ruleset/ruleset_config.php (第240-261行 -> 第240-305行)
+
+调试信息将写入doc/etc/目录下的调试文件：
+- ruleset_debug_YYYY-MM-DD_HH-MM-SS.txt (来自roommng.func.php)
+- can_create_debug_YYYY-MM-DD_HH-MM-SS.txt (来自ruleset_config.php)
+
+增强的调试功能:
+1. 在roommng_create_new_room函数中记录权限检查前的状态
+2. 在can_create_ruleset_room函数中记录详细的检查过程
+3. 记录所有相关变量的值和检查结果
+
+可能的问题原因:
+1. $ruleset_enabled变量未正确设置
+2. $ruleset_config数组未正确加载
+3. 用户数据中的groupid或credits2字段有问题
+4. 变量作用域问题导致全局变量访问失败
+
+下一步:
+用户需要在测试环境中尝试创建ruleset房间，然后检查生成的两个调试文件，确定具体的权限检查失败原因。

@@ -21,7 +21,7 @@ function parse_queue_vnmix_info($carr)
 		}
 	}
 	// 格式化名称
-	$carr['itm_desc'] = parse_nameinfo_desc($carr['itm']);
+	$carr['itm_desc'] = parse_nameinfo_desc($carr['itm'], '', '', '', isset($carr['itmpara']) ? $carr['itmpara'] : '', $carr['itmk']);
 	// 格式化类别
 	$carr['itmk_desc'] = parse_kinfo_desc($carr['itmk'],$carr['itmsk']);
 	// 合并显示类
@@ -48,13 +48,13 @@ function get_queue_vnmix_list($id=NULL)
 			return $db->fetch_array($result);
 		}
 	}
-	else 
+	else
 	{
 		$result = $db->query("SELECT * FROM {$gtablepre}vnmixitem ");
 		if($db->num_rows($result))
-		{ 
+		{
 			while($t = $db->fetch_array($result,MYSQLI_ASSOC))
-			{	
+			{
 				$carr[$t['iid']] = $t;
 				unset($carr[$t['iid']]['iid']);
 			}
@@ -212,7 +212,7 @@ function writeover_vn_mixilst($varr=Array())
 			if($key == 'itms') $narr['result'][3] = $arr;
 			if($key == 'itmsk') $narr['result'][4] = $arr;
 		}
-		else 
+		else
 		{
 			$narr[$key] = $arr;
 		}
@@ -237,11 +237,11 @@ function edit_vn_mixilst($varr,$t)
 	global $checkstr,$gamecfg;
 	//先加锁
 	$lock_file = GAME_ROOT.'./gamedata/bak/vnmix2.lock';
-	if(file_exists($lock_file)) 
+	if(file_exists($lock_file))
 	{
 		return '有其他管理员正在进行编辑操作，请稍等一会儿再试！';
 	}
-	else 
+	else
 	{
 		$cache_file = config('vnmixitem',$gamecfg);
 		if(file_exists($cache_file))
@@ -251,7 +251,7 @@ function edit_vn_mixilst($varr,$t)
 			include_once($cache_file);
 			global $vn_mixinfo;
 		}
-		else 
+		else
 		{
 			return '合成配方文件不存在！不能进行编辑操作。';
 		}

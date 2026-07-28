@@ -9,7 +9,7 @@ include_once GAME_ROOT.'./include/game/itemmain.func.php';
 $mix_type = Array('normal' => '通常','sync' => '同调', 'overlay' => '超量');
 
 // 合成功能
-function itemmix_rev($mlist, $itemselect=-1, &$data=NULL) 
+function itemmix_rev($mlist, $itemselect=-1, &$data=NULL)
 {
 	global $log,$mode,$cmd,$main,$itemcmd;
 	if(!isset($data))
@@ -25,7 +25,7 @@ function itemmix_rev($mlist, $itemselect=-1, &$data=NULL)
 	$mix_res = itemmix_get_result($mlist,$data);
 	# 尝试进行合成操作时 合成操作计数+1
 	if(empty($clbpara['achvars']['immix'])) $clbpara['achvars']['immix'] = 1;
-	
+
 	$mixitemname = array();
 	foreach($mlist as $val) $mixitemname[] = ${'itm'.$val};
 	$itmstr = implode(' ', $mixitemname);
@@ -127,7 +127,7 @@ function itemmix_place_check($mlist,&$data=NULL)
 		return false;
 	}
 	$main = 'itemmix_tips';
-	$mlist2 = array_unique($mlist);	
+	$mlist2 = array_unique($mlist);
 	if(count($mlist) != count($mlist2)) {
 		$log .= '相同道具不能进行合成！<br>';
 		$mode = 'itemmix'; 	$itemcmd = 'itemmix';
@@ -166,7 +166,7 @@ function itemmix_recipe_check($mixitem)
 			}
 		}
 	}
-	return $res;	
+	return $res;
 }
 
 //查看是否符合同调要求
@@ -366,7 +366,12 @@ function itemmix_proc($mlist, $minfo, $itmstr, &$data=NULL)
 	else{
 		$itmsk0 = '';
 	}
-	$itmpara0 = $minfo['result'][5];
+	// Handle itmpara field
+	if (isset($minfo['result'][5]))
+		$itmpara0 = $minfo['result'][5];
+	else{
+		$itmpara0 = '';
+	}
 	$uip['mixcls'] = !empty($minfo['class']) ? $minfo['class'] : '';
 	$uip['mixtp'] = $minfo['type'];
 	//合成成功
@@ -390,13 +395,19 @@ function itemmix_proc($mlist, $minfo, $itmstr, &$data=NULL)
 //合成成功时会触发的额外事件
 function itemmix_events(&$data=NULL)
 {
-	global $log,$gamevars;
+	global $log,$gamevars,$nosta;
 	if(!isset($data))
 	{
 		global $pdata;
 		$data = &$pdata;
 	}
 	extract($data,EXTR_REFS);
+
+	// RuleSet钩子：合成物品前处理
+	if(function_exists('ruleset_itemmix_hook')) {
+		ruleset_itemmix_hook($data);
+		extract($data,EXTR_REFS); // 重新提取可能被修改的变量
+	}
 
 	# 合成成功时爆熟+1
 	$wd+=1;
@@ -422,14 +433,14 @@ function itemmix_events(&$data=NULL)
 				'鲜红的生血','真-红色的发圈','『红石电路』','【烈焰红唇】','红宝石方块','红莲魔龙 ★8');
 			$royal_rose_stuff = $slip_list[array_rand($slip_list)];
 			$royal_rose = Array(
-				'class' => 'hidden', 
+				'class' => 'hidden',
 				'stuff' => array('「皇家蔷薇」','龙虎旗帜',$royal_rose_stuff),
 				'result' => array('「猩红蔷薇」','WK',179310,'∞','BNnrfcV'),
 			);
 			$gamevars['random_mixlist']['royal_rose'] = $royal_rose;
 			save_gameinfo();
 		}
-		else 
+		else
 		{
 			$royal_rose = $gamevars['random_mixlist']['royal_rose'];
 			$royal_rose_stuff = $royal_rose['stuff'][2];
@@ -477,7 +488,16 @@ function itemmix_events(&$data=NULL)
 	if($itm0 == 'Untainted Glory'){
 		$log .= "<span class='minirainbow'>一道强光闪过——<br>
 			你背包中的物品一瞬间全部消失了！<br>这是获得无毁荣光的必要代价！</span><br>";
-		$itm1 = $itmk1 = $itmsk1 = $itm2 = $itmk2 = $itmsk2 = $itm3 = $itmk3 = $itmsk3 = $itm4 = $itmk4 = $itmsk4 = $itm5 = $itmk5 = $itmsk5 = $itm6 = $itmk6 = $itmsk6 = $itmpara0= $itmpara1 =$itmpara2 =$itmpara3 =$itmpara4 =$itmpara5 = $itmpara6 =0;'';
+		$itm1 = $itmk1 = $itmsk1 = $itm2 = $itmk2 = $itmsk2 = $itm3 = $itmk3 = $itmsk3 = $itm4 = $itmk4 = $itmsk4 = $itm5 = $itmk5 = $itmsk5 = $itm6 = $itmk6 = $itmsk6 = '';
+		$itmpara1 = $itmpara2 = $itmpara3 = $itmpara4 = $itmpara5 = $itmpara6 = '';
+		$itme1 = $itms1 = $itme2 = $itms2 = $itme3 = $itms3 = $itme4 = $itms4 = $itme5 = $itms5 = $itme6 = $itms6 = 0;
+	}
+
+	if($itm0 == '☢核子核心☢'){
+		$log .= "<span class='lime'>这是何等强大的力量——<br>
+			核子核心的能量融化了你背包里面全部的东西！</span><br>";
+		$itm1 = $itmk1 = $itmsk1 = $itm2 = $itmk2 = $itmsk2 = $itm3 = $itmk3 = $itmsk3 = $itm4 = $itmk4 = $itmsk4 = $itm5 = $itmk5 = $itmsk5 = $itm6 = $itmk6 = $itmsk6 = '';
+		$itmpara1 = $itmpara2 = $itmpara3 = $itmpara4 = $itmpara5 = $itmpara6 = '';
 		$itme1 = $itms1 = $itme2 = $itms2 = $itme3 = $itms3 = $itme4 = $itms4 = $itme5 = $itms5 = $itme6 = $itms6 = 0;
 	}
 	return;

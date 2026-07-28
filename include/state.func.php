@@ -5,7 +5,7 @@
 	}
 
 	# 没有目标击杀，自然死亡时的事件（可能也不是那么“自然”……）
-	function death($death, $kname = '', $ktype = 0, $annex = '',&$data=NULL) 
+	function death($death, $kname = '', $ktype = 0, $annex = '',&$data=NULL)
 	{
 		global $now, $db, $tablepre, $gtablepre, $alivenum, $deathnum, $killmsginfo, $typeinfo, $weather;
 
@@ -14,12 +14,19 @@
 			global $pdata;
 			$data = &$pdata;
 		}
+		# RuleSet钩子：可在自然/事件死亡写入新闻与统计前取消死亡。
+		# RuleSet hook: allow natural/event death cancellation before news and counters are written.
+		if(function_exists('ruleset_natural_death_hook'))
+		{
+			$ruleset_death_cancelled = ruleset_natural_death_hook($data,$death,$kname,$ktype,$annex);
+			if($ruleset_death_cancelled === true) return '';
+		}
 		extract($data,EXTR_REFS);
 
 		$bid = 0; $action = '';
 
 		if (!$death) return;
-			
+
 		$hp = 0;
 		if ($death == 'poison') {
 			$state = 26;
@@ -68,7 +75,7 @@
 		} else {
 			$state = 10;
 		}
-		
+
 		$killmsg = '';
 		if ($ktype == 0 && $kname) {
 			$result = $db->query ( "SELECT killmsg FROM {$gtablepre}users WHERE username = '$kname'" );
@@ -82,8 +89,8 @@
 		}
 
 		$dname = $name;
-		
-		if (!$type) 
+
+		if (!$type)
 		{
 			$dname = (!empty($nick) || $nick == 0) ? $nick.'|'.$name : $name;
 			$alivenum--;
@@ -109,10 +116,17 @@
 
 	# 执行不需要考虑复活问题的击杀事件：
 	# 再重复一遍：这里的第一个参数指的是杀人者(敌对方)视角，第二个参数指的是死者(受到伤害者)视角。
-	function pre_kill_events(&$pa,&$pd,$active,$death) 
+	function pre_kill_events(&$pa,&$pd,$active,$death)
 	{
 		global $log, $now, $db, $gtablepre, $tablepre, $typeinfo, $lwinfo;
-		
+
+		# RuleSet钩子：可在遗言、聊天和死亡新闻生成前取消击杀报告。
+		# RuleSet hook: allow kill cancellation before last words, chat and death news are emitted.
+		if(function_exists('ruleset_pre_kill_cancel_hook') && ruleset_pre_kill_cancel_hook($pa,$pd,$active,$death) === true)
+		{
+			return '';
+		}
+
 		// 登记死法
 		// 传入了数字编号死法
 		if (is_numeric($death)) {
@@ -134,6 +148,8 @@
 			$pd['state'] = 25;
 		} elseif ($death == 'F') {
 			$pd['state'] = 29;
+		} elseif ($death == 'B') {
+			$pd['state'] = 60;
 		} elseif ($death == 'poison') {
 			$pd['state'] = 26;
 		} elseif ($death == 'trap') {
@@ -151,7 +167,7 @@
 			$lastword = is_array($lwinfo[$dtype]) ? $lwinfo[$dtype][$dname] : $lwinfo[$dtype];
 		}
 		//初始化玩家遗言
-		else 
+		else
 		{
 			$result = $db->query ( "SELECT lastword FROM {$gtablepre}users WHERE username ='$dname'");
 			$lastword = $db->result ( $result, 0 );
@@ -173,6 +189,15 @@
 	function revive_process(&$pa,&$pd,$active)
 	{
 		global $log,$weather,$now,$gamevars;
+
+		# RuleSet钩子：非NULL返回值直接作为本次复活判定结果。
+		# RuleSet hook: a non-NULL result becomes the revival result for this death.
+		if(function_exists('ruleset_revive_process_hook'))
+		{
+			$ruleset_revival = ruleset_revive_process_hook($pa,$pd,$active);
+			if($ruleset_revival !== NULL) return $ruleset_revival;
+		}
+
 		include_once GAME_ROOT.'./include/game/clubslct.func.php';
 
 		if(empty($pa['nm'])) $pa['nm'] = $active && !$pa['type'] ? '你' : $pa['name'];
@@ -198,8 +223,8 @@
 				#奥罗拉复活效果
 				$revival_flag = 18; //保存复活标记为通过光玉雨复活
 				addnews($now,'wth18_revival',$dname,$dnick);
-				$pd['hp'] = max($wth18_obbs,1);  
-				$pd['sp'] = max($wth18_obbs,1); 
+				$pd['hp'] = max($wth18_obbs,1);
+				$pd['sp'] = max($wth18_obbs,1);
 				$pd['state'] = 0;
 				$log.= "<span class=\"lime\">但是，飞舞着的光玉们钻进了{$pd['nm']}的身体，让{$pd['nm']}重新站了起来！</span><br>";;
 				return $revival_flag;
@@ -216,7 +241,7 @@
 				#奥罗拉复活效果
 				$revival_flag = 17; //保存复活标记为通过奥罗拉复活
 				addnews($now,'aurora_revival',$dname,$dnick);
-				$pd['hp'] = max($aurora_dice,1); 
+				$pd['hp'] = max($aurora_dice,1);
 				$pd['sp'] = max($aurora_dice,1);
 				$pd['state'] = 0;
 				$log.= "<span class=\"lime\">但是，空气中弥漫着的奥罗拉让{$pd['nm']}重新站了起来！</span><br>";;
@@ -225,14 +250,14 @@
 		}
 
 		# 「涅槃」复活：
-		if (!$revival_flag && isset($pd['skill_c19_nirvana']))	
+		if (!$revival_flag && isset($pd['skill_c19_nirvana']))
 		{
 			# 「涅槃」复活效果：
 			$revival_flag = 'nirvan'; //保存复活标记为通过技能复活
-			addnews($now,'revival',$dname,$dnick);	
+			addnews($now,'revival',$dname,$dnick);
 			# 添加「涅槃」激活次数
 			set_skillpara('c19_nirvana','active_t',get_skillpara('c19_nirvana','active_t',$pd['clbpara'])+1,$pd['clbpara']);
-			$pd['state'] = 0; 
+			$pd['state'] = 0;
 			$pd['hp'] = 1; $pd['sp'] = 1;
 			# 将多出的rp转化为生命和防御力
 			if($pd['rp'])
@@ -256,6 +281,14 @@
 	{
 		global $log,$now,$alivenum,$deathnum,$db,$gtablepre,$tablepre;
 
+		# 为绕过常规revive_process的旧击杀路径提供最后一道RuleSet复原机会。
+		# Give legacy kill paths that bypass revive_process one final RuleSet recovery chance.
+		if(function_exists('ruleset_revive_process_hook'))
+		{
+			$ruleset_revival = ruleset_revive_process_hook($pa,$pd,$active);
+			if($ruleset_revival) return;
+		}
+
 		if(empty($pa['nm'])) $pa['nm'] = $active && !$pa['type'] ? '你' : $pa['name'];
 		if(empty($pd['nm'])) $pd['nm'] = !$active && !$pd['type'] ? '你' : $pd['name'];
 
@@ -270,7 +303,7 @@
 			$alivenum --;
 			if(!empty($last)) $log .= "<span class='evergreen'>{$pd['nm']}用尽最后的力气喊道：“".$last."”</span><br>";
 		}
-		else 
+		else
 		{
 			//死者是NPC，加载NPC遗言
 			if(!empty($last)) $log .= npc_chat_rev ($pd,$pa, 'death' );
@@ -299,7 +332,7 @@
 		if(!$pa['type'])
 		{
 			include_once GAME_ROOT.'./include/game/achievement.func.php';
-			check_battle_achievement_rev($pa,$pd);	
+			check_battle_achievement_rev($pa,$pd);
 		}
 		# 保存游戏进行状态
 		player_save($pd);
@@ -311,6 +344,11 @@
 	function check_death_events(&$pa,&$pd,$active)
 	{
 		global $db,$tablepre,$log,$now,$nosta;
+		include_once GAME_ROOT.'./include/game/quest.func.php';
+
+		// RuleSet钩子：在NPC特殊死亡副作用生效前记录可回滚状态。
+		// RuleSet hook: capture reversible NPC state before special death side effects are applied.
+		if(function_exists('ruleset_player_kill_hook')) ruleset_player_kill_hook($pa,$pd,$active);
 
 		# 静流下线事件：
 		if($pd['type'] == 15)
@@ -331,6 +369,20 @@
 
 		# Process 百命猫 Kills
 		if($pd['name'] == '是TSEROF啦！'){
+			// 确保 clbpara 是数组
+			if(!is_array($pd['clbpara'])) {
+				if(is_string($pd['clbpara'])) {
+					$pd['clbpara'] = json_decode($pd['clbpara'], true);
+				}
+				if(!is_array($pd['clbpara'])) {
+					$pd['clbpara'] = array();
+				}
+			}
+
+			// 确保 lifedestroyed 字段存在且为数字
+			if(!isset($pd['clbpara']['lifedestroyed']) || !is_numeric($pd['clbpara']['lifedestroyed'])) {
+				$pd['clbpara']['lifedestroyed'] = 0;
+			}
 			$pd['clbpara']['lifedestroyed'] += 1;
 			//make her disappear from map if all life are destroyed.
 			if($pd['clbpara']['lifedestroyed'] > 111){
@@ -342,13 +394,16 @@
 		# 保存击杀种火或小兵的记录
 		if(empty($pa['clbpara']['achvars']['kill_minion']) && ($pd['type'] == 90 || $pd['type'] == 91 || $pd['type'] == 92)) $pa['clbpara']['achvars']['kill_minion'] = 1;
 
+		// QUEST NPC死亡事件 / QUEST NPC death handling
+		quest_handle_npc_death($pa,$pd);
+
 		# 成就504，保存在RF高校用过的武器记录
 		if($pa['pls'] == 2) $pa['clbpara']['achvars']['ach504'][$pa['wep_kind']] = 1;
 
 
 		# 快递被劫事件：
-		if(isset($pd['clbpara']['post'])) 
-		{	
+		if(isset($pd['clbpara']['post']))
+		{
 			$log.="<span class='sienna'>某样东西从{$pd['name']}身上掉了出来……</span><br>";
 			//获取快递信息
 			$iid = $pd['clbpara']['postid'];
@@ -422,7 +477,7 @@
 			else $sk_lvl = 0;
 			$sk_att_vars = get_skillvars('c12_bloody','attgain',$sk_lvl);
 			$sk_def_vars = get_skillvars('c12_bloody','defgain',$sk_lvl);
-			$pa['att'] += $sk_att_vars; $pa['def'] += $sk_def_vars; 
+			$pa['att'] += $sk_att_vars; $pa['def'] += $sk_def_vars;
 			$log .= '<span class="yellow">「浴血」使'.$pa['nm'].'的攻击增加了'.$sk_att_vars.'点，防御增加了'.$sk_def_vars.'点！</span><br>';
 		}
 
@@ -449,7 +504,7 @@
 
 		return;
 	}
-		
+
 	# 怒气上涨事件
 	function rgup_rev(&$pa,&$pd,$active)
 	{
@@ -514,7 +569,7 @@
 				$sk_var = get_skillvars($sk,'rpgain',$sk_lvl);
 				$rpup = round($rpup*(1-($sk_var/100)));
 			}
-			else 
+			else
 			{
 				$sk_var = get_skillvars($sk,'rploss',$sk_lvl);
 				$rpup = round($rpup*(1+($sk_var/100)));
@@ -524,9 +579,17 @@
 	}
 
 	# 经验上涨事件
-	function expup_rev(&$pa,&$pd,$active) 
+	function expup_rev(&$pa,&$pd,$active)
 	{
 		global $log,$baseexp;
+
+		# 「洁净」技能判定：战斗时无法获得经验值
+		if(!empty($pa['clbpara']['skill']) && in_array('npc_purity', $pa['clbpara']['skill']))
+		{
+			$log.='<span class="yellow">「洁净」使'.$pa['nm'].'无法获得经验值！</span><br>';
+			return;
+		}
+
 		# 攻击命中的情况下，计算获得经验
 		if($pa['hitrate_times'] > 0)
 		{
@@ -546,7 +609,7 @@
 			{
 				$log.='<span class="yellow">「解构」使'.$pa['nm'].'获得了额外'.$sk_up.'点经验！</span><br>';
 				$expup += $sk_up;
-			}		
+			}
 		}
 		if(!empty($expup)) $pa['exp'] += $expup;
 		//$log .= "$isplayer 的经验值增加 $expup 点<br>";
@@ -554,7 +617,7 @@
 		//升到下级所需的exp 直接在这里套公式计算 不用global了
 		$pa['upexp'] = round(($pa['lvl']*$baseexp)+(($pa['lvl']+1)*$baseexp));
 
-		if ($pa['exp'] >= $pa['upexp']) 
+		if ($pa['exp'] >= $pa['upexp'])
 		{
 			lvlup_rev ($pa,$pd,$active);
 		}
@@ -562,12 +625,12 @@
 	}
 
 	# 等级提升事件
-	function lvlup_rev(&$pa,&$pd,$active) 
+	function lvlup_rev(&$pa,&$pd,$active)
 	{
 		global $log,$baseexp,$upexp;
 		if(empty($pa['nm'])) $pa['nm'] = $active ? '你' : $pa['name'];
 		$up_exp_temp = round ( (2 * $pa['lvl'] + 1) * $baseexp );
-		if ($pa['exp'] >= $up_exp_temp && $pa['lvl'] < 255) 
+		if ($pa['exp'] >= $up_exp_temp && $pa['lvl'] < 255)
 		{
 			$sklanginfo = Array ('wp' => '殴熟', 'wk' => '斩熟', 'wg' => '射熟', 'wc' => '投熟', 'wd' => '爆熟', 'wf' => '灵熟', 'all' => '全系熟练度' );
 			$sknlist = Array (1 => 'wp', 2 => 'wk', 3 => 'wc', 4 => 'wg', 5 => 'wd', 9 => 'wf', 12 => 'all' );
@@ -577,7 +640,7 @@
 			$lvup = $lvup > 255 - $pa['lvl'] ? 255 - $pa['lvl'] : $lvup;
 			$lvuphp = $lvupatt = $lvupdef = $lvupskill = $lvupsp = $lvupspref = 0;
 			//升级数值计算
-			for($i = 0; $i < $lvup; $i += 1) 
+			for($i = 0; $i < $lvup; $i += 1)
 			{
 				if ($pa['club'] == 12) {
 					$lvuphp += rand ( 14, 18 );
@@ -592,7 +655,7 @@
 					$lvupatt += rand ( 2, 4 );
 					$lvupdef += rand ( 3, 5 );
 				}
-				
+
 				if ($skname == 'all') {
 					$lvupskill += rand ( 2, 4 );
 				}elseif ($skname == 'wf') {
@@ -602,7 +665,7 @@
 				}elseif($skname){
 					$lvupskill += rand ( 4, 6 );
 				}
-				$lvupspref += round($pa['msp'] * 0.1);		
+				$lvupspref += round($pa['msp'] * 0.1);
 			}
 			//应用升级
 			$pa['lvl'] += $lvup;
@@ -633,7 +696,7 @@
 				}
 			}
 			$pa['sp'] = min($lvupspref+$pa['sp'],$pa['msp']);
-			
+
 			if ($skname) {
 				$sklog = "，{$sklanginfo[$skname]}+{$lvupskill}";
 			}
@@ -658,11 +721,11 @@
 		global $now, $db, $tablepre, $gtablepre;
 		global $alivenum, $deathnum, $name, $w_state, $type, $pid, $typeinfo, $pls, $lwinfo, $w_achievement;
 		global $weather;
-		
+
 		if (! $death || ! $dname) {
 			return;
 		}
-		
+
 		if ($death == 'N') {
 			$w_state = 20;
 		} elseif ($death == 'P') {
@@ -684,18 +747,18 @@
 		} else {
 			$w_state = 10;
 		}
-		
+
 		$killmsg = '';
 		$result = $db->query ( "SELECT killmsg FROM {$gtablepre}users WHERE username = '$name'" );
 		$killmsg = $db->result ( $result, 0 );
-		
+
 		if (! $dtype) {
 			//$alivenum = $db->result($db->query("SELECT COUNT(*) FROM {$tablepre}players WHERE hp>0 AND type=0"), 0);
 			$alivenum --;
 		}
 		$deathnum ++;
-		
-		
+
+
 		if ($dtype) {
 			$lwname = $typeinfo [$dtype] . ' ' . $dname;
 			if (is_array ( $lwinfo [$dtype] )) {
@@ -703,22 +766,22 @@
 			} else {
 				$lastword = $lwinfo [$dtype];
 			}
-			
+
 			$db->query ( "INSERT INTO {$tablepre}chat (type,`time`,send,recv,msg) VALUES ('3','$now','$lwname','$pls','$lastword')" );
 		} else {
 			$lwname = $typeinfo [$dtype] . ' ' . $dname;
 			$result = $db->query ( "SELECT lastword FROM {$gtablepre}users WHERE username = '$dname'" );
 			$lastword = $db->result ( $result, 0 );
-			
+
 			$db->query ( "INSERT INTO {$tablepre}chat (type,`time`,send,recv,msg) VALUES ('3','$now','$lwname','$pls','$lastword')" );
 		}
 		$result = $db->query("SELECT nick FROM {$tablepre}players WHERE name = '$name' AND type = '$type'");
 		$knick = $db->result($result, 0);
 		addnews ( $now, 'death' . $w_state, $dname, $dtype, $knick.' '.$name, $annex, $lastword );
-		
+
 		$result = $db->query("SELECT * FROM {$tablepre}players WHERE pid=$dpid" );
 		$res=$db->fetch_array($result);
-		
+
 		$revivaled=false;
 		//依次判定复活效果
 		if (!$revival_flag && $weather == 17)
@@ -732,11 +795,11 @@
 				addnews($now,'aurora_revival',$res['name']);
 				$res['hp'] += min($res['mhp'],max($aurora_dice,1)); $res['sp'] += min($res['msp'],max($aurora_dice,1));
 				$res['state']=0;
-				$alivenum++; 
+				$alivenum++;
 				$revival_flag = 17;
 			}
 		}
-		if (!$revival_flag && $res['type']==0 && $res['club']==99 && ($death=="N" || $death=="P" || $death=="K" || $death=="G" || $death=="C" ||$death=="D" || $death=="F" || $death=="J" || $death=="trap"))	
+		if (!$revival_flag && $res['type']==0 && $res['club']==99 && ($death=="N" || $death=="P" || $death=="K" || $death=="G" || $death=="C" ||$death=="D" || $death=="F" || $death=="J" || $death=="trap"))
 		{
 			addnews($now,'revival',$res['name']);	//玩家春哥附体称号的处理
 			$res['hp'] = $res['mhp']; $res['sp'] = $res['msp'];
@@ -796,7 +859,7 @@
 					$lvupatt += rand ( 2, 4 );
 					$lvupdef += rand ( 3, 5 );
 				}
-				
+
 				if ($skname == 'all') {
 					$lvupskill += rand ( 2, 4 );
 				} elseif ($skname == 'wd' || $skname == 'wf') {
@@ -804,7 +867,7 @@
 				}elseif($skname){
 					$lvupskill += rand ( 4, 6 );
 				}
-				$lvupspref += round(${$perfix . 'msp'} * 0.1);		
+				$lvupspref += round(${$perfix . 'msp'} * 0.1);
 			}
 			$lvl += $lvup;
 			$up_exp_temp = round ( (2 * $lvl + 1) * $baseexp );
@@ -830,10 +893,10 @@
 			} elseif ($skname) {
 				${$perfix . $skname} += $lvupskill;
 			}
-			
+
 			if (${$perfix . 'sp'}+$lvupspref >= ${$perfix . 'msp'}) {
 				$lvupspref =  ${$perfix . 'msp'} - ${$perfix . 'sp'};
-				
+
 			}
 			${$perfix . 'sp'} += $lvupspref;
 			if ($skname) {
@@ -930,7 +993,7 @@
 			$log .= "你已经死亡，无法治疗。<br>";
 			return;
 		}
-		
+
 		if ($state == 1) rest_get_tips($resttime);
 
 		if ($state == 1 || $state == 3) {
@@ -941,7 +1004,7 @@
 			$upsp=max(0,$upsp);
 			if(!$upsp && $sp >= $msp) $log .= "已经不需要休息了。";
 			else $log .= "你的体力恢复了<span class=\"yellow\">$upsp</span>点。";
-		} 
+		}
 
 		if ($state == 2 || $state == 3) {
 			$oldhp = $hp;
@@ -949,9 +1012,16 @@
 			$hp += $uphp; $hp = min($hp, $mhp);
 			$uphp = $hp - $oldhp;
 			$uphp=max(0,$uphp);
+
+			# 「起迹」标记清除：
+			if($uphp > 0 && isset($clbpara['tl_oncemore_used'])) {
+				unset($clbpara['tl_oncemore_used']);
+				$log .= "<span class='yellow'>「起迹」技能恢复了效果！</span><br>";
+			}
+
 			if(!$uphp && $hp >= $mhp) $log .= "没有伤口需要治疗了。";
 			else $log .= "你的生命恢复了<span class=\"yellow b\">$uphp</span>点。";
-		} 
+		}
 
 		if($state == 3)
 		{
@@ -993,21 +1063,22 @@
 				}
 			}
 		}
-		
+
 		$log .= '<br>';
 
-		if ($command != 'rest') {
+		// 如果命令不是 rest 或 fishing，则退出休息状态
+		if ($command != 'rest' && $command != 'fishing') {
 			$state = 0;
 			$endtime = $now;
 			$mode = 'command';
 		}
 		return;
 	}
-	
+
 	function rest_get_tips($resttime)
 	{
 		global $db, $tablepre, $plsinfo, $log;
-		
+
 		//睡眠时，每隔多少秒获得一条提示
 		$rest_get_tip_rate = 30;
 		//睡眠时，一次最多获得多少条提示
@@ -1016,7 +1087,7 @@
 		$tip_npctype = array(2,5,6,11,12,13,14,21,24,26,89);
 		//睡眠时会提示的道具名列表
 		$tip_itemnamelist = array('肥料', '中药', '火把', '铁锤', '广域生命探测器', '★阔剑地雷★', '毒物说明书', '☆碧藍怒火☆', '☆白楼剑☆', '☆楼观剑☆', '钻石', '宅男装', '萝莉装', '女仆装', '伪娘装', '电子马克笔', '一个能打的都没有', '德国BOY的键盘', '葱娘の葱', '容嬷嬷的针', '新八的眼镜', '新华里的领带', '新华里的西服', '新华里的手表', '新华里的皮鞋', '新华里的投入', '新华里的震撼', '新华里的乱舞', '新华里的手势', '新华里的呐喊', '新华里的眼神', '新华里的增员', '红色方块', '绿色方块', '蓝色方块', '黄色方块', '金色方块', '银色方块', '水晶方块', '黑色方块', '白色方块', 'X方块', 'Y方块', '妹汁', '《BR大逃杀》', '《防身术图解》', '《剑道社教材》', '《枪械杂志》', '《飞镖投掷法》', '《化学课本》', '《太极拳指南》', '【腕力强化剂】', '【皮肤强化剂】', '【神经强化剂】', '【超级战士药剂】', '【肉体强化剂】', '【线粒体强化剂】', '提示纸条E', '提示纸条I', '提示纸条K', '提示纸条N', '弱点探测器', '【北斗百裂拳】', '【狂暴凶刃】', '【盖特机炮】', '幻符【杀人玩偶】', '【泰迪熊炸弹】', '【西方秋霜玉】', '预言挂坠', '【紫棠花色波纹疾走】', '弱爆了！', '《哲♂学》', '★全图唯一的野生巨大香蕉★', '残存的礼品盒', '残存的结婚喜糖-红', '残存的结婚喜糖-橙', '残存的结婚喜糖-黄', '残存的结婚喜糖-绿', '残存的结婚喜糖-青', '残存的结婚喜糖-蓝', '残存的结婚喜糖-紫', '糖衣炮弹-红', '糖衣炮弹-橙', '糖衣炮弹-黄', '糖衣炮弹-绿', '糖衣炮弹-青', '糖衣炮弹-蓝', '糖衣炮弹-紫', '密封的酒瓶', '音乐录像', '五线乐谱', '葱娘肉包', 'V家蔬菜汁', '破旧录音机', '神奇的八音盒', '魂之结晶', '歌手之魂', '【Alicemagic】', '【Crow Song】', '「奥西里斯之天空龙」-仮', '「欧贝利斯克之巨神兵」-仮', '「太阳神之翼神龙」-仮', '【流星一条】', '杨叔的眼镜', '蓝蓝路的大鞋', '动感超人手表', 'MIKU的内裤', '■DeathNote■', '■魔剑－雷瓦丁■', '★Unlimited Blade Works★', '★Unlimited Code Works★', '《ACFUN大逃杀攻略》', '《北斗神拳》', '《寒蝉鸣泣之时》', '《魔法少女奈叶》', '《网球王子》', '《新机动战记高达W》', '《东方永夜抄》', '【触手的萃取液】', '【圣防护罩-反射之力】', '【金蚕王】', '【我已经天下无敌了！】', '【残机碎片】', '【S2机关】', '【宇航服】', '【楼主头】', '【哥哥鞋】', '受王拳', '★闪光迎击神话★', '鲜红的生血', '《东方幻想乡》', '★I-力场★', '奇怪的按钮', '【主角光环】', '【测试用具】', '驱云弹');
-		
+
 		$get_tips_count = floor($resttime / $rest_get_tip_rate);
 		if (rand(0,99) < $resttime) $get_tips_count += 1;//奖励骰
 		$get_tips_count = min($get_tips_count, $rest_get_tip_max);
@@ -1102,7 +1173,7 @@
 			$log .= implode('',$tips);
 		}
 	}
-	
+
 	function array_randompick($arr, $num=1)
 	{
 		$array_rand = array_rand($arr, $num);

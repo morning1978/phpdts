@@ -1,0 +1,185 @@
+# 枫火歌者种火数据结构修复
+时间：2025-06-14 (NOUVEAU DAY 68)
+
+## 问题描述
+
+根据测试玩家反馈和个人推定，枫火歌者的设计与实现存在以下逻辑问题：
+
+1. **数据冗余问题**：被收纳的种火的icon、hp、mhp、sp、msp、att、def、pls以及身上的装备等本已包含在players表其自己的数据目前存在了clbpara中，这导致侧边栏显示的对应数据和实际这些NPC的数据有时会不同步，clbpara中的信息应是对应这些NPC数据的指针，从而减少clbpara本身的长度，并保证玩家看见的数据一直和players表中的实际数据一致。
+
+2. **死亡状态检查缺失**：玩家可以对被杀死（hp = 0）或者被尸体销毁（hp = 0且pls=254）的种火进行操作，且它们会正常运用跟随和索敌逻辑，这是不符合逻辑的——玩家不能对死亡或者被尸体销毁的种火进行操作，它们也不应该参与跟随，索敌以及提升玩家数值的逻辑。
+
+## 修复方案
+
+### 1. 修改种火数据存储结构
+
+**修改文件**: `include/game/club22.func.php`
+
+- 在 `FireseedRecruit` 函数中，将种火数据存储从完整复制改为指针式存储
+- 只在 `clbpara['fireseed']` 中保留管理信息：
+  - `level`: 强化等级
+  - `mode`: 部署模式
+  - `horizon`: 视界状态
+  - `items`: 探物收集的物品
+  - `recruited_time`: 收纳时间
+
+**修改前**:
+```php
+$clbpara['fireseed'][$fireseed_id] = array(
+    'name' => $npc['name'],
+    'icon' => $npc['icon'],
+    'level' => 1,
+    'mode' => 0,
+    'pls' => $pls,
+    'horizon' => 0,
+    'hp' => $npc['mhp'],
+    'mhp' => $npc['mhp'],
+    // ... 更多冗余数据
+);
+```
+
+**修改后**:
+```php
+$clbpara['fireseed'][$fireseed_id] = array(
+    'level' => 1,
+    'mode' => 0,
+    'horizon' => 0,
+    'items' => array(),
+    'recruited_time' => $now
+);
+```
+
+### 2. 添加辅助函数
+
+新增两个辅助函数来处理种火数据：
+
+```php
+function getFireseedRealTimeData($fireseed_id) {
+    // 从players表获取种火实时数据
+    // 检查种火是否死亡或被销毁
+    // 返回完整的种火数据或null
+}
+
+function isFireseedAlive($fireseed_id) {
+    // 检查种火是否存活且可用
+    // 返回布尔值
+}
+```
+
+### 3. 修改种火行为函数
+
+在所有种火行为函数中添加死亡状态检查：
+
+- `FireseedSearch`: 探物逻辑
+- `FireseedDrainNPC`: 索敌逻辑  
+- `FireseedFollow`: 跟随逻辑
+- `FireseedBuffBonus`: 属性加成逻辑
+- `FireseedDeploy`: 部署逻辑
+- `FireseedEnhance`: 强化逻辑
+
+每个函数在处理种火前都会调用 `isFireseedAlive()` 检查种火状态。
+
+### 4. 创建实时数据API
+
+**新增文件**: `fireseed_data.php`
+
+提供种火实时数据的API接口，返回JSON格式的数据：
+- 合并管理数据（来自clbpara）和实时数据（来自players表）
+- 标记死亡种火的状态
+- 供前端JavaScript调用
+
+### 5. 修改前端显示逻辑
+
+**修改文件**: `templates/default/slidingpanel.htm`
+
+- 修改 `updateFireseedStatusTable()` 函数
+- 使用新的API获取实时数据
+- 添加 `fetchFireseedRealTimeData()` 函数
+- 添加备用显示逻辑 `updateFireseedStatusTableFallback()`
+
+## 修复效果
+
+1. **数据一致性**: 侧边栏显示的种火数据现在直接来自players表，确保与实际状态一致
+2. **死亡状态处理**: 死亡或被销毁的种火不再参与任何游戏逻辑
+3. **性能优化**: 减少了clbpara中的数据冗余，降低了存储开销
+4. **代码维护性**: 统一了数据获取方式，便于后续维护
+
+## 测试建议
+
+1. 测试种火收纳功能
+2. 测试种火部署到不同模式
+3. 测试种火死亡后的状态显示
+4. 测试种火强化功能
+5. 测试侧边栏数据更新
+6. 测试种火跟随、探物、索敌逻辑
+
+## 问题修复记录
+
+### 问题：HTTP 500错误 - fetch_playerdata_by_name函数未定义
+
+**错误信息**：
+```
+PHP Fatal error: Uncaught Error: Call to undefined function fetch_playerdata_by_name() in fireseed_data.php:17
+```
+
+**原因分析**：
+`fireseed_data.php` 文件中调用了 `fetch_playerdata_by_name()` 函数，但没有包含定义该函数的文件 `include/game.func.php`。
+
+**修复方案**：
+在 `fireseed_data.php` 中添加必要的包含文件：
+
+```php
+include_once './include/common.inc.php';
+include_once GAME_ROOT.'./include/game.func.php';  // 新增
+include_once GAME_ROOT.'./include/game/club22.func.php';
+```
+
+**修复时间**：2025-06-14
+
+### 问题：种火重复显示
+
+**问题描述**：
+侧边栏中每个种火被显示了两次，相同ID和内容的种火出现重复行。
+
+**原因分析**：
+1. `updateFireseedStatusTable()` 函数中表格清空逻辑不完善
+2. 备用函数 `updateFireseedStatusTableFallback()` 中存在语法错误
+3. 前端验证逻辑仍在检查已不存在的 `name` 字段
+
+**修复方案**：
+1. 在获取实时数据后再次确保表格清空
+2. 修复备用函数中缺少 `insertRow()` 的错误
+3. 更新前端验证逻辑，移除对 `name` 字段的检查
+
+**修复时间**：2025-06-14
+
+### 问题：种火强化HTTP 500错误和探物功能失效
+
+**问题描述**：
+1. 种火强化时返回HTTP 500错误：`Call to a member function query() on null`
+2. 种火探物功能失去原有功能
+
+**原因分析**：
+1. **数据库错误**：`FireseedEnhance` 函数中缺少 `$db` 和 `$tablepre` 全局变量声明
+2. **探物逻辑问题**：种火行为检查逻辑不够健壮，没有正确处理新旧数据格式的兼容性
+
+**修复方案**：
+1. **修复数据库错误**：
+   ```php
+   function FireseedEnhance($fireseed_id, $item_index) {
+       global $log, $fireseed_enhance_multipliers, $db, $tablepre; // 添加缺失的全局变量
+   ```
+
+2. **改进种火行为检查逻辑**：
+   - 优先检查 `pose` 字段（新数据格式）
+   - 如果没有 `pose` 字段，则使用 `mode` 字段（旧数据兼容）
+   - 统一所有种火行为函数的检查逻辑
+
+**修复时间**：2025-06-14
+
+## 注意事项
+
+1. 现有的种火数据需要进行迁移，旧的冗余数据会被忽略
+2. 前端需要处理API调用失败的情况
+3. 死亡种火的物品仍然保留在clbpara中，可以被获取
+4. `fireseed_data.php` 需要正确包含所有依赖的函数文件

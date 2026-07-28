@@ -8,7 +8,13 @@ require './include/common.inc.php';
 require GAME_ROOT.'./include/game.func.php';
 
 //判断是否进入游戏
-if(!$cuser||!$cpass) { gexit($_ERROR['no_login'],__file__,__line__); } 
+if(!$cuser||!$cpass) { gexit($_ERROR['no_login'],__file__,__line__); }
+
+// RuleSet钩子：在读取玩家行前取得整条指令请求所需的互斥资源。
+// RuleSet hook: acquire request-wide mutual exclusion before reading the player row.
+if(function_exists('ruleset_command_request_begin_hook') && ruleset_command_request_begin_hook() === false) {
+	gexit('RAID状态正忙，请稍后重试。',__file__,__line__);
+}
 
 //$result = $db->query("SELECT * FROM {$tablepre}players WHERE name = '$cuser' AND type = 0");
 $pdata = fetch_playerdata_by_name($cuser);
@@ -69,7 +75,7 @@ if($hp > 0){
 			$log .= "<span class=\"yellow\">{$noisemin}分钟前，{$plsinfo[$noisepls]}传来了{$noiseinfo[$noisemode]}。</span><br>";
 		}
 	}
-	
+
 	if ($club==0 && !isset($clubavl))
 	{
 		include_once GAME_ROOT.'./include/game/clubslct.func.php';
@@ -85,7 +91,7 @@ if($hp > 0){
 		include_once GAME_ROOT.'./include/game/itembag.func.php';
 		overnumlimit();
 	}
-	
+
 	//判断冷却时间是否过去
 	if($coldtimeon){
 		$cdover = $cdsec*1000 + $cdmsec + $cdtime;
@@ -103,22 +109,50 @@ if($hp > 0){
 		goto cd_flag;
 	}
 
-	//执行动作前，身上存在追击标记时，直接进入追击判定
-	if(!empty($action) && in_array($action,Array('chase','pchase','dfight','cover')) && $mode !== 'revcombat')
+	// 未定义RuleSet动作钩子时，保持原有追击优先级不变。
+	// Preserve the original chase priority when the active ruleset has no action hook.
+	if(!function_exists('ruleset_command_prepare_hook') && !empty($action) && in_array($action,Array('chase','pchase','dfight','cover')) && $mode !== 'revcombat')
 	{
 		$command = $action;
 		goto chase_flag;
 	}
+
+	$ruleset_command_blocked = false;
+	$ruleset_command_value = isset($command) ? $command : '';
+	if(!empty($action) && in_array($action,Array('chase','pchase','dfight','cover')) && $mode !== 'revcombat') $ruleset_command_value = $action;
+
 	//执行动作前检查是否有无法跳过且未阅览过的对话框
-	if(!empty($clbpara['noskip_dialogue']) && strpos($command,'end_dialogue')===false)
+	if(!empty($clbpara['noskip_dialogue']) && strpos($command,'end_dialogue')===false && strpos($command,'dialogue_choice')!==0)
 	{
-		$opendialog = $clbpara['noskip_dialogue'];
-		if(!empty($clbpara['dialogue'])) $dialogue_id = $clbpara['dialogue'];
+		if(!empty($clbpara['dialogue'])) {
+			$opendialog = 'dialogue';
+			$dialogue_id = $clbpara['dialogue'];
+		} else {
+			$opendialog = $clbpara['noskip_dialogue'];
+		}
 	}elseif($coldtimeon && $rmcdtime > 0 && (strpos($command,'move')===0 || strpos($command,'search')===0 || (strpos($command,'itm')===0)&&($command != 'itemget') || strpos($sp_cmd,'sp_weapon')===0 || strpos($command,'song')===0)){
 		$log .= '<span class="yellow">冷却时间尚未结束！</span><br>';
 		cd_flag:
 		$mode = 'command';
 	}else{
+		// RuleSet钩子：只在对话与冷却检查通过后结算动作，追击也不会绕过。
+		// RuleSet hook: settle actions only after dialog/cooldown checks; chase actions cannot bypass it.
+		if(function_exists('ruleset_command_prepare_hook')) {
+			$ruleset_command_blocked = ruleset_command_prepare_hook($pdata, $ruleset_command_value) === false;
+		}
+		if($ruleset_command_blocked) {
+			$mode = 'command';
+			goto ruleset_command_finished;
+		}
+
+		//执行动作前，身上存在追击标记时，直接进入追击判定。
+		// Enter chase resolution directly when a chase marker exists before the action.
+		if(!empty($action) && in_array($action,Array('chase','pchase','dfight','cover')) && $mode !== 'revcombat')
+		{
+			$command = $action;
+			goto chase_flag;
+		}
+
 		//进入指令判断
 		if(!empty($itemindex))
 		{
@@ -165,11 +199,19 @@ if($hp > 0){
 					$state = substr($command,4,1);
 					$mode = 'rest';
 				}
+			} elseif($command == 'fishing') {
+				include_once GAME_ROOT.'./include/game/fishing.func.php';
+				start_fishing($pdata);
+				if($mode == 'fishing') {
+					// 如果成功开始钓鱼，同时应用休息效果
+					include_once GAME_ROOT.'./include/state.func.php';
+					rest('rest', $pdata);
+				}
 			} elseif($command == 'itemmain') {
 				if(($club == 20 && $itemcmd == 'itemmix') || ($club != 20 && ($itemcmd == 'elementmix' || $itemcmd == 'elementbag'))){
 					$log .= "你的手突然掐住了你的头左右摇摆！<br><span class='yellow'>“你还想要干什么，啊？你还想要干什么！！”</span><br>看来你的手和脑子之间起了一点小摩擦。<br><br>";
 					$mode = 'command';
-				} else {	
+				} else {
 					if($itemcmd == 'itemmix' || $itemcmd == 'elementmix'){
 						$main = 'itemmix_tips';
 					}
@@ -201,13 +243,13 @@ if($hp > 0){
 				}elseif($sp_cmd == 'sp_trapadtsk'){
 					$position = 0;
 					if ($club==7)
-					{	
+					{
 						foreach(Array(1,2,3,4,5,6) as $imn)
 							if(strpos(${'itmk'.$imn},'B')===0 && ${'itme'.$imn} > 0 ){
 								$position = $imn;
 								break;
 							}
-						if (!$position) 
+						if (!$position)
 						{
 							$log .= '<span class="red">你没有电池，无法改造陷阱！</span><br />';
 							$mode = 'command';
@@ -220,13 +262,13 @@ if($hp > 0){
 								$position = $imn;
 								break;
 							}
-						if (!$position) 
+						if (!$position)
 						{
 							$log .= '<span class="red">你没有毒药，无法改造陷阱！</span><br />';
 							$mode = 'command';
 						}
 					}
-					else  
+					else
 					{
 						$log .= '<span class="red">你不懂得如何改造陷阱！</span><br />';
 						$mode = 'command';
@@ -375,7 +417,7 @@ if($hp > 0){
 					$p12[1]=1; $p12[2]=2;
 					$mode='sp_skpts';
 				//妙手技能
-				}elseif($sp_cmd == 'sp_pickpocket_selected'){		
+				}elseif($sp_cmd == 'sp_pickpocket_selected'){
 					if (!isset($choice)) {
 						$mode = 'command';
 					} else {
@@ -383,13 +425,105 @@ if($hp > 0){
 						include_once GAME_ROOT . './include/game/revclubskills_extra.func.php';
 						skill_tl_pickpocket_act($choice);
  					}
-					$mode = 'command';				
+					$mode = 'command';
+				}elseif($sp_cmd == 'sp_fireseed_deploy' && $club == 22){
+					include_once GAME_ROOT.'./include/game/club22.func.php';
+					if(isset($fireseed_id) && isset($deploy_mode)){
+						$deploy_pls = isset($deploy_pls) ? intval($deploy_pls) : $pls;
+						$log .= "<span class='yellow'>DEBUG: 部署位置 $deploy_pls</span><br>";
+						FireseedDeploy($fireseed_id, $deploy_mode, $deploy_pls);
+					}else{
+						$log .= '<span class="red">请选择要部署的种火和部署模式！</span><br>';
+					}
+					$mode = 'command';
+				}elseif($sp_cmd == 'sp_fireseed_getitem' && $club == 22){
+					include_once GAME_ROOT.'./include/game/club22.func.php';
+					if(isset($fireseed_item_id) && isset($item_id)){
+						// 从种火物品池中获取物品
+						if(isset($clbpara['fireseed'][$fireseed_item_id]['items'][$item_id])){
+							$item = $clbpara['fireseed'][$fireseed_item_id]['items'][$item_id];
+
+							// 检查itm0是否为空
+							if(empty($itm0)){
+								// 将物品放入itm0（发现物品栏位）
+								$itm0 = $item['itm'];
+								$itmk0 = $item['itmk'];
+								$itme0 = $item['itme'];
+								$itms0 = $item['itms'];
+								$itmsk0 = $item['itmsk'];
+								$itmpara0 = isset($item['itmpara']) ? $item['itmpara'] : '';
+
+								// 从种火物品池中移除物品
+								unset($clbpara['fireseed'][$fireseed_item_id]['items'][$item_id]);
+
+								$log .= '<span class="lime">你从种火「'.$clbpara['fireseed'][$fireseed_item_id]['name'].'」处取回了探索到的物品！</span><br>';
+
+								// 调用itemfind函数触发物品发现流程
+								include_once GAME_ROOT.'./include/game/itemmain.func.php';
+								itemfind($pdata);
+							}else{
+								// itm0已被占用，将物品放入地图并添加到玩家视野
+								$db->query("INSERT INTO {$tablepre}mapitem (itm, itmk, itme, itms, itmsk, itmpara, pls) VALUES ('{$item['itm']}', '{$item['itmk']}', '{$item['itme']}', '{$item['itms']}', '{$item['itmsk']}', '".addslashes(isset($item['itmpara']) ? $item['itmpara'] : '')."', '$pls')");
+								$new_item_id = $db->insert_id();
+
+								// 从种火物品池中移除物品
+								unset($clbpara['fireseed'][$fireseed_item_id]['items'][$item_id]);
+
+								// 将物品添加到玩家视野
+								include_once GAME_ROOT.'./include/game.func.php';
+								check_add_searchmemory($new_item_id, 'itm', $item['itm'], $pdata);
+
+								// 保存更新后的clbpara数据到数据库
+								$encoded_clbpara = json_encode($clbpara, JSON_UNESCAPED_UNICODE);
+								$db->query("UPDATE {$tablepre}players SET clbpara='$encoded_clbpara' WHERE pid='$pid'");
+
+								$log .= '<span class="lime">你从种火「'.$clbpara['fireseed'][$fireseed_item_id]['name'].'」处取回了探索到的物品「'.$item['itm'].'」！</span><br>';
+								$log .= '<span class="yellow">由于你的双手已经拿着其他物品，取回的物品出现在了你的视野中。</span><br>';
+								$mode = 'command';
+							}
+						}else{
+							$log .= '<span class="red">指定的物品不存在！</span><br>';
+							$mode = 'command';
+						}
+					}else{
+						$log .= '<span class="red">请选择要获取物品的种火和物品！</span><br>';
+						$mode = 'command';
+					}
+				}elseif($sp_cmd == 'sp_fireseed_enhance' && $club == 22){
+					include_once GAME_ROOT.'./include/game/club22.func.php';
+					if(isset($enhance_fireseed_id) && isset($enhance_item)){
+						$enhance_result = FireseedEnhance($enhance_fireseed_id, $enhance_item);
+						if($enhance_result) {
+							// 添加侧边栏刷新标记，确保侧边栏能够实时更新
+							$log .= "<span id='HsUipfcGhU'></span>";
+							$log .= '<span class="lime">种火强化成功！</span><br>';
+							$mode = 'command';
+						}
+					}else{
+						$log .= '<span class="red">请选择要强化的种火和焰火物品！</span><br>';
+					}
+					$mode = 'command';
+				}elseif($sp_cmd == 'sp_save_fireseed_select' && $club == 22){
+					// 保存种火选择状态到clbpara
+					if(isset($select_type) && isset($fireseed_id)){
+						if(!isset($clbpara['fireseed_ui_state'])) {
+							$clbpara['fireseed_ui_state'] = array();
+						}
+						$clbpara['fireseed_ui_state'][$select_type] = $fireseed_id;
+
+						// 保存到数据库
+						$encoded_clbpara = json_encode($clbpara, JSON_UNESCAPED_UNICODE);
+						$db->query("UPDATE {$tablepre}players SET clbpara='$encoded_clbpara' WHERE pid='$pid'");
+
+						$log .= "<!-- 种火选择状态已保存: {$select_type} = {$fireseed_id} -->";
+					}
+					$mode = 'command';
 				}else{
 					$mode = $sp_cmd;
-				}				
+				}
 			} elseif($command == 'team') {
 				include_once GAME_ROOT.'./include/game/team.func.php';
-				if($teamcmd == 'teamquit') {				
+				if($teamcmd == 'teamquit') {
 					teamquit();
 				} else{
 					teamcheck();
@@ -415,14 +549,85 @@ if($hp > 0){
 				else{
 					$mode='command';
 				}
+			} elseif(strpos($command,'dialogue_choice') === 0) {
+				// 处理对话选择
+				$choice_parts = explode(' ', $command);
+				if(count($choice_parts) >= 3) {
+					$dialogue_id = $choice_parts[1];
+					$choice_index = $choice_parts[2];
+
+					// 检查对话 ID 和选择索引是否有效
+					if(isset($dialogue_branch[$dialogue_id]) && isset($dialogue_branch[$dialogue_id][$choice_index])) {
+						// 记录玩家的选择
+						$clbpara['dialogue_choice'] = array(
+							'dialogue_id' => $dialogue_id,
+							'choice_index' => $choice_index,
+							'choice_text' => $dialogue_branch[$dialogue_id][$choice_index]
+						);
+
+						// 输出选择的结果
+						$log .= "你选择了：<span class=\"yellow\">{$dialogue_branch[$dialogue_id][$choice_index]}</span><br>";
+
+						// 添加非常明显的错误信息
+						//$log .= "<div style='background-color: red; color: white; padding: 10px; margin: 10px; border: 2px solid black;'>对话选择调试信息: 对话 ID = {$dialogue_id}, 选择索引 = {$choice_index}</div>";
+
+						// 如果有对应的选择结果日志，显示它
+						$choice_log_key = $dialogue_id.'_choice_'.$choice_index;
+
+						// 调试信息，显示对话日志的键值
+						//$log .= "<!-- DEBUG: 对话 ID: {$dialogue_id}, 选择索引: {$choice_index}, 选择日志键: {$choice_log_key} -->";
+
+						// 显示所有可用的对话日志键
+						//$log .= "<!-- DEBUG: 可用的对话日志键: ";
+						//foreach($dialogue_log as $key => $value) {
+						//	$log .= "{$key}, ";
+						//}
+						//$log .= " -->";
+
+						if(isset($dialogue_log[$choice_log_key]) && !empty($dialogue_log[$choice_log_key])) {
+							//$log .= "<!-- DEBUG: 使用选择特定日志 -->";
+							$log .= $dialogue_log[$choice_log_key];
+						} elseif(isset($dialogue_log[$dialogue_id]) && !empty($dialogue_log[$dialogue_id])) {
+							// 如果没有特定选择的日志，显示通用日志
+							//$log .= "<!-- DEBUG: 使用通用日志 -->";
+							$log .= $dialogue_log[$dialogue_id];
+						} else {
+							$log .= "<!-- DEBUG: 没有找到对应的对话日志 -->";
+						}
+
+						// 清除对话状态
+						unset($clbpara['dialogue']);
+						unset($clbpara['noskip_dialogue']);
+
+						// 确保对话框不会重新打开
+						$dialogue_id = null;
+						$opendialog = null;
+
+						// 设置命令模式为命令模式，确保页面能够正确显示选择结果
+						$mode = 'command';
+					} else {
+						$log .= "<span class=\"red\">无效的对话选择！</span><br>";
+					}
+				} else {
+					$log .= "<span class=\"red\">对话选择格式错误！</span><br>";
+				}
 			} elseif(strpos($command,'end_dialogue') === 0) {
 				//$log.="【DEBUG】关闭了对话框。";
 				if(!empty($dialogue_log[$clbpara['dialogue']])) $log.= $dialogue_log[$clbpara['dialogue']];
 				unset($clbpara['dialogue']); unset($clbpara['noskip_dialogue']);
+			} elseif ($command == 'choose_fish') {
+				// 处理鱼篓子物品选择
+				if (isset($clbpara['fish_basket'])) {
+					include_once GAME_ROOT.'./include/game/item.nouveau_booster1.php';
+					item_nouveau_booster1($clbpara['fish_basket']['position'], $pdata);
+				} else {
+					$log .= '出现了错误，请重新使用鱼篓子。<br>';
+					$mode = 'command';
+				}
 			} elseif (strpos($command,'memory')===0) {
 				$smn = substr($command,6);
 				if(!empty($clbpara['smeo'] && isset($clbpara['smeo'][$smn]))){
-					$iid = $clbpara['smeo'][$smn][0]; $itp = $clbpara['smeo'][$smn][1]; 
+					$iid = $clbpara['smeo'][$smn][0]; $itp = $clbpara['smeo'][$smn][1];
 					lost_searchmemory($smn,$pdata);
 					if($itp == 'itm'){
 						include_once GAME_ROOT.'./include/game/search.func.php';
@@ -522,6 +727,21 @@ if($hp > 0){
 				change_subwep();
 				$mode = 'command';
 			}
+		} elseif($mode == 'quest') {
+			include_once GAME_ROOT.'./include/game/quest.func.php';
+			if($command == 'quest_accept') {
+				$qid = isset($questselect) ? $questselect : '';
+				$accepted = quest_accept_offer($qid, $pdata);
+				$mode = $accepted ? 'command' : 'quest';
+			} elseif($command == 'quest_reject') {
+				quest_reject_offer($pdata, true);
+				$mode = 'command';
+			} elseif($command == 'quest_cancel') {
+				quest_reject_offer($pdata, false);
+				$mode = 'command';
+			} else {
+				if(empty($clbpara['quest']['pending'])) $mode = 'command';
+			}
 		} elseif($mode == 'special') {
 			include_once GAME_ROOT.'./include/game/special.func.php';
 			if(strpos($command,'pose') === 0) {
@@ -550,9 +770,9 @@ if($hp > 0){
 					$horizon = $chor;
 					$log .= "视界切换为<span class=\"yellow\">$horizoninfo[$chor]</span>。<br> ";
 					# 切换视界后，丢失所有视野
-					lost_searchmemory('all',$pdata); 
+					lost_searchmemory('all',$pdata);
 					# 向页面发送刷新标记
-					$log .= "<span id='HsUipfcGhU'></span>"; 
+					$log .= "<span id='HsUipfcGhU'></span>";
 				}else{
 					$log .= "<span class=\"yellow\">这种想法太奇怪了！</span><br> ";
 				}
@@ -593,7 +813,23 @@ if($hp > 0){
 			\revbattle\revbattle_prepare($command,$message);
 		} elseif($mode == 'rest') {
 			include_once GAME_ROOT.'./include/state.func.php';
-			rest($command);
+			// 如果在休息状态下点击钓鱼按钮，则进入钓鱼状态
+			if($command == 'fishing') {
+				include_once GAME_ROOT.'./include/game/fishing.func.php';
+				start_fishing($pdata);
+				// 如果成功进入钓鱼状态，保持原有的休息状态
+				if($mode == 'fishing') {
+					// 不需要调用rest函数，因为钓鱼状态下会自动应用休息效果
+				}
+			} else {
+				rest($command);
+			}
+		} elseif($mode == 'fishing') {
+			include_once GAME_ROOT.'./include/game/fishing.func.php';
+			fishing_command($command, $pdata);
+			// 在钓鱼的同时也应用休息效果
+			include_once GAME_ROOT.'./include/state.func.php';
+			rest($command, $pdata);
 //		} elseif($mode == 'chgpassword') {
 //			include_once GAME_ROOT.'./include/game/special.func.php';
 //			chgpassword($oldpswd,$newpswd,$newpswd2);
@@ -601,8 +837,18 @@ if($hp > 0){
 //			include_once GAME_ROOT.'./include/game/special.func.php';
 //			chgword($newmotto,$newlastword,$newkillmsg);
 		} elseif($mode == 'corpse') {
-			include_once GAME_ROOT.'./include/game/itemmain.func.php';
-			getcorpse($command);
+			if($command == 'fireseed_recruit' && $club == 22) {
+				include_once GAME_ROOT.'./include/game/club22.func.php';
+				$result = $db->query("SELECT * FROM {$tablepre}players WHERE pid='$bid' AND hp=0");
+				if($db->num_rows($result) > 0) {
+					$npc = $db->fetch_array($result);
+					FireseedRecruit($npc);
+				}
+				$mode = 'command';
+			} else {
+				include_once GAME_ROOT.'./include/game/itemmain.func.php';
+				getcorpse($command);
+			}
 		} elseif($mode == 'team') {
 			include_once GAME_ROOT.'./include/game/team.func.php';
 			if ($command=="teammake") teammake($nteamID,$nteamPass,(int)$ticon);
@@ -698,8 +944,8 @@ if($hp > 0){
 							skill_merc_chase($sk,${$sk.'mkey'});
 						} elseif(isset(${$sk.'mkey'}) && isset(${$sk.${$sk.'mkey'}.'moveto'})){
 							skill_merc_move($sk,${$sk.'mkey'},${$sk.${$sk.'mkey'}.'moveto'});
-						} 
-					} 
+						}
+					}
 				}
 			}
 			$mode = 'command';
@@ -711,7 +957,7 @@ if($hp > 0){
 			command_end_flag:
 			$mode = 'command';
 		}
-		
+
 		if($action == 'pacorpse' && $gamestate < 40){
 //			if($state == 1 || $state == 2 || $state ==3){
 //				$state = 0;
@@ -722,11 +968,11 @@ if($hp > 0){
 				if($db->num_rows($result)>0){
 					$edata = $db->fetch_array($result);
 					include_once GAME_ROOT.'./include/game/battle.func.php';
-					findcorpse($edata);					
-				}	
-			}	
+					findcorpse($edata);
+				}
+			}
 		}
-				
+
 		//指令执行完毕，更新冷却时间
 		if($coldtimeon && isset($cmdcdtime)){
 			$nowmtime = floor(getmicrotime()*1000);
@@ -745,14 +991,23 @@ if($hp > 0){
 		$endtime = $now;
 		$cmdnum ++;
 	}
+	ruleset_command_finished:
 	//检查是否需要重生成播放器
 	$bgm_player = init_bgm();
 	if(!empty($bgm_player))
 	{
 		$gamedata['innerHTML']['ingamebgm'] = $bgm_player;
 	}
+	// RuleSet钩子：在保存玩家数据与决定弹窗前结算模式事件。
+	// RuleSet hook: settle mode events before saving player data and choosing a dialog.
+	if(function_exists('ruleset_command_end_hook')) {
+		ruleset_command_end_hook($pdata, isset($command) ? $command : '');
+	}
 	//检查执行动作后是否有对话框产生
-	if(!empty($clbpara['dialogue']))
+	//如果刚刚处理了对话选择，则不显示对话框
+	$just_made_choice = strpos($command, 'dialogue_choice') === 0;
+
+	if(!$just_made_choice && !empty($clbpara['dialogue']))
 	{
 		$opendialog = 'dialogue';
 		$dialogue_id = $clbpara['dialogue'];
@@ -767,6 +1022,11 @@ if($hp > 0){
 	}
 	player_save($pdata);
 }
+// RuleSet钩子：玩家数据持久化完成后释放指令级资源；死亡页面请求也需要释放。
+// RuleSet hook: release command-scoped resources after persistence, including death-page requests.
+if(function_exists('ruleset_command_post_save_hook')) {
+	ruleset_command_post_save_hook($pdata, isset($command) ? $command : '');
+}
 init_profile();
 if($hp <= 0) {
 	$dtime = date("Y年m月d日H时i分s秒",$endtime);
@@ -779,7 +1039,7 @@ if($hp <= 0) {
 	include template('death');
 	$gamedata['innerHTML']['cmd'] = ob_get_contents();
 	$mode = 'death';
-} elseif($cmd){	
+} elseif($cmd){
 	$gamedata['innerHTML']['cmd'] = $cmd;
 } elseif($itms0){
 	ob_clean();
@@ -787,7 +1047,13 @@ if($hp <= 0) {
 	$gamedata['innerHTML']['cmd'] = ob_get_contents();
 } elseif($state == 1 || $state == 2 || $state ==3) {
 	ob_clean();
-	include template('rest');
+	if($mode == 'fishing') {
+		// 在钓鱼模式下显示钓鱼界面
+		$fishing_count = count($clbpara['fishing']['caught_items']);
+		include template('fishing');
+	} else {
+		include template('rest');
+	}
 	$gamedata['innerHTML']['cmd'] = ob_get_contents();
 } elseif(!$cmd) {
 	ob_clean();
@@ -810,12 +1076,18 @@ if(isset($opendialog)){$log.="<span style=\"display:none\" id=\"open-dialog\">{$
 if(isset($url)){$gamedata['url'] = $url;}
 $gamedata['innerHTML']['pls'] = (!isset($plsinfo[$pls]) && isset($hplsinfo[$pgroup])) ? $hplsinfo[$pgroup][$pls] : $plsinfo[$pls];
 $gamedata['innerHTML']['anum'] = $alivenum;
+// 传递位置ID给JavaScript，用于更新背景图片
+$gamedata['locationId'] = $pls;
 
 ob_clean();
 $main ? include template($main) : include template('profile');
 $gamedata['innerHTML']['main'] = ob_get_contents();
+// 添加调试信息，显示最终的 log 变量状态
+$log .= "<!-- DEBUG: 最终的 log 变量长度: " . strlen($log) . " -->";
+
 $gamedata['innerHTML']['log'] = $log;
 if(isset($error)){$gamedata['innerHTML']['error'] = $error;}
+$gamedata['clbpara'] = $clbpara;
 $gamedata['value']['teamID'] = $teamID;
 if($teamID){
 	$gamedata['innerHTML']['chattype'] = "<select name=\"chattype\" value=\"2\"><option value=\"0\" selected>$chatinfo[0]<option value=\"1\" >$chatinfo[1]</select>";

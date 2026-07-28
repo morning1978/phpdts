@@ -11,9 +11,9 @@
 		<td class="b8" valign="top" rowspan=2>
 			<div style="position:relative;width:140px;height:340px;">
 				<!--{if !empty($tdata['iconImgB'])}-->
-				<IMG src="img/$tdata['iconImgB']" style="border:0;height:340px;position:absolute;left:0px;top:0px;<!--{if $tdata['hp']==0}-->filter: grayscale(100%)<!--{/if}-->" />
+				<IMG src="$tdata['iconImgB']" style="border:0;height:340px;position:absolute;left:0px;top:0px;<!--{if $tdata['hp']==0}-->filter: grayscale(100%)<!--{/if}-->" />
 				<!--{else}-->
-				<IMG src="img/$tdata['iconImg']" style="border:0;height:80px;<!--{if $tdata['hp']==0}-->filter: grayscale(100%)<!--{/if}-->" />
+				<IMG src="$tdata['iconImg']" style="border:0;height:80px;<!--{if $tdata['hp']==0}-->filter: grayscale(100%)<!--{/if}-->" />
 				<!--{/if}-->
 			</div>
 		</td>
@@ -21,7 +21,7 @@
 			<table border="0" cellspacing="0" height=75px width=580px cellpadding="0" width="100%" valign="middle">
 				<tr>
 					<td class="b1" colspan=2 height=20px><span>$tdata['lvlinfo']</span></td>											
-					<td class="b1" colspan=2><span>$tdata['nameinfo']</span></td>											
+					<td class="b1" colspan=2><span>$tdata['nameinfo']<!--{if !empty($tdata['clbpara']['PlatformName'])}--> （$tdata['clbpara']['PlatformName']）<!--{/if}--></span></td>											
 					<td class="b1" colspan=2><span>{$tdata['typeinfo']}{$tdata['sNoinfo']}</span><!--{if $sdata['club']==19}--> 【<span class="lime">报应点数：<span id="anum">$tdata['rp']</span></span>】<!--{/if}--></td>											
 				</tr>
 				<tr>
@@ -79,9 +79,9 @@
 		<td class="b8" width=140px rowspan="2" valign="bottom">
 			<div style="position:relative;width:140px;height:350px;">
 				<!--{if !empty($sdata['iconImgB'])}-->
-					<IMG src="img/$sdata['iconImgB']" style="border:0;height:340px;position:absolute;left:0px;bottom:-10px;<!--{if $sdata['hp']==0}-->filter: grayscale(100%)<!--{/if}-->" />
+					<IMG src="$sdata['iconImgB']" style="border:0;height:340px;position:absolute;left:0px;bottom:-10px;<!--{if $sdata['hp']==0}-->filter: grayscale(100%)<!--{/if}-->" />
 				<!--{else}-->
-					<IMG src="img/$sdata['iconImg']" style="border:0;height:80px;position:absolute;left:0;bottom:0;<!--{if $sdata['hp']==0}-->filter: grayscale(100%)<!--{/if}-->" />
+					<IMG src="$sdata['iconImg']" style="border:0;height:80px;position:absolute;left:0;bottom:0;<!--{if $sdata['hp']==0}-->filter: grayscale(100%)<!--{/if}-->" />
 				<!--{/if}-->
 			</div>
 		</td>
@@ -91,7 +91,7 @@
 			<table border="0" width=580px height=80px cellspacing="0" cellpadding="0" valign="middle">
 				<tr>
 					<td class="b1" colspan=2 height=20px><span>$typeinfo[$sdata['type']]({$sexinfo[$sdata['gd']]}{$sdata['sNo']}号)</span></td>
-					<td class="b1" colspan=2><span>$sdata['name']</span></td>
+					<td class="b1" colspan=2><span>$sdata['name']<!--{if !empty($sdata['clbpara']['PlatformName'])}--> （$sdata['clbpara']['PlatformName']）<!--{/if}--></span></td>
 					<td class="b1" colspan=2><span>Lv. $sdata['lvl']</span></td>
 				</tr>
 				<tr>

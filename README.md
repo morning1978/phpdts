@@ -1,5 +1,6 @@
 # 常磐大逃杀（PHP Battle Royale）
 
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/amarillonmc/phpdts)
 A PHP based game emulating the settings and gameplay of the original Battle Royale series, with a lot of original spin and an original story with tons of references to pop culture.
 
 ## 依赖

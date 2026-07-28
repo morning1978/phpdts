@@ -1,0 +1,35 @@
+2024年7月19日 $itmpara 字段 JSON 处理实现记录
+
+在2024年7月19日，游戏中的物品添加了新的字段$itmpara，该字段为一数组，可让物品有着数组中定义的键值的属性。
+由于$itmpara可能包含JSON格式的数据，而JSON中的逗号会导致在使用逗号分隔的配置文件中出现问题，因此我们实现了一种特殊的处理方法来解决这个问题。
+
+以下是对应此字段的实现记录：
+
+1. 地图物品（mapitem_1.php）
+   - 修改了system.func.php文件中的地图物品生成代码，添加了对JSON对象中逗号的特殊处理
+   - 当检测到一行中包含JSON对象（以{开头，以}结尾）时，会先提取JSON内容，然后用占位符替换，再进行逗号分隔
+   - 分割后，如果itmpara字段是占位符，则替换回实际的JSON内容
+
+2. 商店物品（shopitem_1.php）
+   - 修改了system.func.php文件中的商店物品生成代码，添加了对JSON对象中逗号的特殊处理
+   - 使用与地图物品相同的方法处理JSON对象中的逗号
+
+3. 合成物品（mixitem_1.php）
+   - 由于mixitem_1.php文件中的$itmpara字段是直接在PHP数组中定义的，不需要特殊处理
+
+注意事项：
+- 这种方法不需要对JSON内容进行编码，保持了原始数据的可读性
+- 不需要修改get_itmpara函数，因为JSON字符串会被原样传递
+- 所有使用$itmpara的代码都不需要修改
+
+示例：
+1. 在mapitem_1.php或shopitem_1.php中定义带有JSON的$itmpara：
+   0,0,1,测试物品,WK,100,10,,{"DecreaseDamageRaw":100,"DecreaseDamagePercentage":10}
+
+2. system.func.php会特殊处理这一行：
+   - 提取JSON内容：{"DecreaseDamageRaw":100,"DecreaseDamagePercentage":10}
+   - 替换为占位符：0,0,1,测试物品,WK,100,10,,JSON_PLACEHOLDER
+   - 分割字符串：[0, 0, 1, 测试物品, WK, 100, 10, , JSON_PLACEHOLDER]
+   - 检测到itmpara是占位符，替换回JSON内容
+
+3. 最终，$itmpara会被正确设置为：{"DecreaseDamageRaw":100,"DecreaseDamagePercentage":10}

@@ -1,4 +1,5 @@
 <?php
+  include_once './include/common.inc.php';
   include_once GAME_ROOT.'./include/game/itemplace.func.php';
   include_once GAME_ROOT.'./include/game/depot.func.php';
   include_once GAME_ROOT.'./include/game/elementmix.func.php';

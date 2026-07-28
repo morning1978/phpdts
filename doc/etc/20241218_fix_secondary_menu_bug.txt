@@ -1,0 +1,66 @@
+修复时间：2024年12月18日
+
+问题描述：
+用户报告所有使用后会进入二级菜单的物品（如毒药、灵魂宝石、祝福宝石、残响兵器、超臆想时空等）使用后都不会进入二级菜单逻辑。这是item.func拆分重构后出现的问题。
+
+问题分析：
+1. 在旧版本的item.func.old中，这些物品的处理逻辑设置了$cmd变量后就结束了，二级菜单能正常显示。
+
+2. 在新的拆分架构中，这些物品被分散到不同的文件中处理：
+   - 毒药、残响兵器、超臆想时空 -> item.tool.php
+   - 灵魂宝石、祝福宝石 -> item.weapon_mod.php
+
+3. 问题的根源是在item.main.php的最后（第237行），它总是强制设置$mode = 'command'，覆盖了二级菜单的设置。
+
+修复方案：
+1. 修改item.main.php，在设置$mode = 'command'之前检查是否已经设置了$cmd变量，如果设置了就不要覆盖mode。
+
+2. 在各个子处理文件中添加global $cmd声明，确保$cmd变量能被正确设置。
+
+具体修改：
+
+1. include/game/item.main.php (第233-238行)：
+   修改前：
+   ```php
+   // 检查成就
+   include_once GAME_ROOT.'./include/game/achievement.func.php';
+   check_item_achievement_rev($name,$i,$ie,$is,$ik,$isk);
+
+   $mode = 'command';
+   return;
+   ```
+   
+   修改后：
+   ```php
+   // 检查成就
+   include_once GAME_ROOT.'./include/game/achievement.func.php';
+   check_item_achievement_rev($name,$i,$ie,$is,$ik,$isk);
+
+   // 只有在没有设置二级菜单时才设置为command模式
+   global $cmd;
+   if (empty($cmd)) {
+       $mode = 'command';
+   }
+   return;
+   ```
+
+2. include/game/item.tool.php：
+   - 残响兵器处理（第58行）：添加global $cmd, $mode;
+   - 超臆想时空处理（第73行）：添加global $cmd, $mode;
+   - 毒药处理（第88行）：添加global $cmd, $mode;
+
+3. include/game/item.weapon_mod.php：
+   - 灵魂宝石/祝福宝石处理（第234行）：添加global $cmd, $mode;
+
+修复逻辑：
+通过这些修改，当物品需要显示二级菜单时：
+1. 子处理函数设置$cmd变量并return
+2. 控制权回到item.main.php
+3. item.main.php检查$cmd是否为空，如果不为空则不设置$mode = 'command'
+4. 二级菜单正常显示
+
+测试建议：
+1. 测试毒药的二级菜单是否正常显示
+2. 测试灵魂宝石和祝福宝石的强化菜单是否正常显示
+3. 测试残响兵器和超臆想时空的命名菜单是否正常显示
+4. 测试■DeathNote■的特殊菜单是否正常显示

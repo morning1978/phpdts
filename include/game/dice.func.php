@@ -73,6 +73,21 @@ function diceroll($dice){
         $wf += $rollRandomizer2;
         $wg += $rollRandomizer2;
         $log .= "<span class=\"lime\">你对随机数大神的反叛令力量注入了你的身体！<br>";
+
+        // 确保 clbpara 是数组
+        if(!is_array($clbpara)) {
+            if(is_string($clbpara)) {
+                $clbpara = json_decode($clbpara, true);
+            }
+            if(!is_array($clbpara)) {
+                $clbpara = array();
+            }
+        }
+
+        // 确保 traitorRoll 字段存在且为数字
+        if(!isset($clbpara['traitorRoll']) || !is_numeric($clbpara['traitorRoll'])) {
+            $clbpara['traitorRoll'] = 0;
+        }
         $clbpara['traitorRoll'] += 1;
     }
 
@@ -105,6 +120,23 @@ function diceroll($dice){
         $log .= "<span class=\"lime\">你本次骰子的检定结果为：</span><span class=\"red\">$result</span>＼<span class=\"yellow\">$dice</span>！<br>";
     }
     //$log .= "【DEBUG】你本次骰子的检定结果为：<br><span class=\"red\">$result</span>＼<span class=\"yellow\">$dice</span>！<br>";
+
+    // 确保 clbpara 是数组，避免 "Cannot use assign-op operators with string offsets" 错误
+    if(!is_array($clbpara)) {
+        // 如果 clbpara 不是数组，尝试解析为数组
+        if(is_string($clbpara)) {
+            $clbpara = json_decode($clbpara, true);
+        }
+        // 如果仍然不是数组，初始化为空数组
+        if(!is_array($clbpara)) {
+            $clbpara = array();
+        }
+    }
+
+    // 确保 diceRolled 字段存在且为数字
+    if(!isset($clbpara['diceRolled']) || !is_numeric($clbpara['diceRolled'])) {
+        $clbpara['diceRolled'] = 0;
+    }
     $clbpara['diceRolled'] += 1;
     return $result;
 }

@@ -1,0 +1,163 @@
+RuleSet系统头像优化和视野系统禁用记录
+时间：2025-06-15 (NOUVEAU DAY 69)
+作者：Augment Agent
+
+## 优化概述
+为RuleSet系统添加了完整的头像支持，使每个旧版本都能使用其专属的玩家和NPC头像。同时在所有RuleSet中禁用了视野系统，以保持旧版本的原始游戏体验。
+
+## 主要修改内容
+
+### 1. RuleSet配置文件头像配置
+在 gamedata/ruleset/ruleset_config.php 中为每个RuleSet添加了 avatar_config 配置：
+
+#### ACBRA_2009版本
+- 男性头像：43个 (m_0.gif 到 m_42.gif)
+- 女性头像：43个 (f_0.gif 到 f_42.gif)
+- NPC头像：映射了17个NPC类型的专用头像
+- 特殊头像：boss.gif, army1.gif, question.gif
+
+#### ACDTS_2011版本
+- 男性头像：21个 (m_0.gif 到 m_20.gif)
+- 女性头像：21个 (f_0.gif 到 f_20.gif)
+- NPC头像：映射了24个NPC类型的专用头像
+- 特殊头像：STAR.gif, question.gif
+
+#### ACDTS_298SP4版本
+- 男性头像：22个 (m_0.gif 到 m_21.gif)
+- 女性头像：21个 (f_0.gif 到 f_20.gif)
+- NPC头像：映射了35个NPC类型的专用头像
+- 特殊头像：PB.gif, p.gif, p2.gif, question.gif
+
+### 2. 头像路径处理函数
+添加了以下新函数：
+
+#### get_ruleset_avatar_path()
+- 根据RuleSet ID和头像类型获取正确的头像路径
+- 支持male、female、npc、special四种头像类型
+- 自动验证头像ID的有效性
+
+#### ruleset_uses_custom_avatars()
+- 检查指定RuleSet是否启用自定义头像
+- 用于判断是否需要使用RuleSet专用头像
+
+#### get_ruleset_avatar_limits()
+- 获取RuleSet的头像数量限制
+- 用于限制用户头像选择范围
+
+### 3. 头像显示逻辑修改
+
+#### include/init.func.php
+修改了头像更新逻辑：
+- 检查当前房间是否使用RuleSet
+- 优先从RuleSet路径加载头像
+- 支持玩家和NPC头像的自动切换
+- 保持向后兼容性
+
+#### include/user.func.php
+修改了 get_iconlist() 函数：
+- 根据RuleSet限制头像选择范围
+- 支持不同性别的头像数量限制
+- 动态调整头像选项列表
+
+### 4. 前端界面支持
+
+#### include/game.js
+修改了 userIconMover() 函数：
+- 支持RuleSet头像路径的JavaScript变量
+- 动态切换头像预览路径
+- 保持默认头像的兼容性
+
+#### templates/default/user.htm
+添加了JavaScript代码：
+- 检测当前房间的RuleSet设置
+- 设置全局的rulesetAvatarPath变量
+- 支持头像预览的动态路径切换
+
+### 5. 视野系统禁用
+
+#### ACBRA_2009版本
+在 gamedata/ruleset/ACBRA_2009/cache/gamecfg_1.php 中：
+- 设置 $allow_semo = 0 禁用视野系统
+
+#### ACDTS_2011版本
+在 gamedata/ruleset/ACDTS_2011/cache/gamecfg_1.php 中：
+- 添加了视野系统配置
+- 设置 $allow_semo = 0 禁用视野系统
+
+#### ACDTS_298SP4版本
+在 gamedata/ruleset/ACDTS_298SP4/cache/gamecfg_1.php 中：
+- 添加了视野系统配置
+- 设置 $allow_semo = 0 禁用视野系统
+
+## 技术实现细节
+
+### 头像路径结构
+每个RuleSet的头像按以下结构组织：
+```
+gamedata/ruleset/{RULESET_ID}/img/
+├── m_0.gif, m_1.gif, ... (男性头像)
+├── f_0.gif, f_1.gif, ... (女性头像)
+├── n_1.gif, n_2.gif, ... (NPC头像)
+└── 特殊头像文件
+```
+
+### 头像加载优先级
+1. 检查是否在RuleSet房间中
+2. 如果是，尝试从RuleSet路径加载头像
+3. 如果RuleSet中没有对应头像，fallback到默认路径
+4. 保持与现有系统的完全兼容
+
+### 用户体验优化
+- 用户在RuleSet房间中只能选择该版本支持的头像
+- 头像预览会显示正确的RuleSet头像
+- 不同版本的头像数量限制自动应用
+- NPC会显示对应版本的专用头像
+
+## 配置示例
+
+### 头像配置结构
+```php
+'avatar_config' => Array(
+    'use_ruleset_avatars' => true,
+    'avatar_path' => './gamedata/ruleset/ACBRA_2009/img/',
+    'male_avatars' => 43,
+    'female_avatars' => 43,
+    'npc_avatars' => Array(
+        1 => 'n_1.gif',     // 董事长/红暮
+        11 => 'n_11.gif',   // 真职人
+        // ... 更多NPC映射
+    ),
+    'special_avatars' => Array(
+        'boss' => 'boss.gif',
+        'question' => 'question.gif',
+    ),
+),
+```
+
+## 测试建议
+1. 测试不同RuleSet房间中的头像显示
+2. 验证用户头像选择范围的正确限制
+3. 检查NPC头像是否显示对应版本的图片
+4. 确认视野系统在所有RuleSet中都被禁用
+5. 测试头像预览功能的正确性
+6. 验证与默认房间的兼容性
+
+## 文件修改列表
+1. gamedata/ruleset/ruleset_config.php - 添加头像配置
+2. include/init.func.php - 修改头像显示逻辑
+3. include/user.func.php - 修改头像选择逻辑
+4. include/game.js - 修改头像预览JavaScript
+5. templates/default/user.htm - 添加RuleSet头像支持
+6. gamedata/ruleset/ACBRA_2009/cache/gamecfg_1.php - 禁用视野系统
+7. gamedata/ruleset/ACDTS_2011/cache/gamecfg_1.php - 禁用视野系统
+8. gamedata/ruleset/ACDTS_298SP4/cache/gamecfg_1.php - 禁用视野系统
+
+## 效果总结
+通过这次优化，RuleSet系统现在能够：
+- 完美还原每个旧版本的头像系统
+- 自动限制用户可选择的头像范围
+- 为NPC显示对应版本的专用头像
+- 禁用现代功能（视野系统）以保持原版体验
+- 保持与现有系统的完全兼容性
+
+这使得时光重现功能更加authentic，玩家能够获得真正的旧版本游戏体验。

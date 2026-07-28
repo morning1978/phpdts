@@ -20,7 +20,7 @@ function findteam(&$w_pdata)
 	extract($pdata,EXTR_REFS);
 	extract($w_pdata,EXTR_PREFIX_ALL,'w');
 	init_battle_rev($pdata,$w_pdata);
-	
+
 	$main = 'battle_rev';
 	$log .= "你发现了队友<span class=\"yellow\">$w_name</span>！<br>";
 
@@ -42,12 +42,12 @@ function findcorpse(&$w_pdata)
 	extract($w_pdata,EXTR_PREFIX_ALL,'w');
 
 	init_battle_rev($pdata,$w_pdata,1);
-	
+
 	$main = 'battle_rev';
 	$log .= '你发现了<span class="red">'.$w_name.'</span>的尸体！<br>';
 
 	# 初始化尸体tooltip
-	foreach (Array('wep','wep2','arb','arh','ara','arf','art','itm0','itm1','itm2','itm3','itm4','itm5','itm6') as $value) 
+	foreach (Array('wep','wep2','arb','arh','ara','arf','art','itm0','itm1','itm2','itm3','itm4','itm5','itm6') as $value)
 	{
 		$value = 'w_'.$value;
 		if(strpos($value,'itm')!==false)
@@ -56,7 +56,7 @@ function findcorpse(&$w_pdata)
 			$s_value = str_replace('itm','itms',$value);
 			$sk_value = str_replace('itm','itmsk',$value);
 		}
-		else 
+		else
 		{
 			$k_value = $value.'k';
 			$s_value = $value.'s';
@@ -66,7 +66,15 @@ function findcorpse(&$w_pdata)
 		global ${$value.'_words'},${$k_value.'_words'},${$s_value.'_words'},${$sk_value.'_words'};
 
 		# 初始化名称样式
-		${$value.'_words'} = parse_nameinfo_desc($$value,$w_horizon);
+		// 判断是背包栏物品还是装备栏物品
+		if(strpos($value,'itm')!==false) {
+			// 背包栏物品的 itmpara 字段名称为 itmpara0、itmpara1 等
+			$para_value = 'w_itmpara'.substr($value, 5);
+		} else {
+			// 装备栏物品的 itmpara 字段名称为 weppara、arbpara 等
+			$para_value = $value.'para';
+		}
+		${$value.'_words'} = parse_nameinfo_desc($$value, $w_horizon, '', '', isset($$para_value) ? $$para_value : '', $$k_value);
 		# 初始化类别样式
 		${$k_value.'_words'} = parse_kinfo_desc($$k_value,$$sk_value);
 		# 初始化属性样式
@@ -81,11 +89,11 @@ function findcorpse(&$w_pdata)
 	// 初始化抡尸数据
 	$cstick_flag = 0;
 	if(!check_skill_unlock('tl_cstick',$pdata) && !check_skill_cost('tl_cstick',$pdata)) $cstick_flag = in_array($w_type,get_skillvars('tl_cstick','notype')) ? 0 : 1;
-	
+
 	// 初始化妙手数据
 	$pickpocket_flag = 0;
 	if(!check_skill_unlock('tl_pickpocket',$pdata) && !check_skill_cost('tl_pickpocket',$pdata)) $pickpocket_flag = 1;
-	
+
 	// 保存发现过女主尸体的记录
 	if($w_pdata['type'] == 14) $clbpara['achvars']['corpse_n14'] += 1;
 
@@ -129,7 +137,7 @@ function senditem()
 	}
 
 	$edata = $db->fetch_array($result);
-	if($edata['pls'] != $pls) 
+	if($edata['pls'] != $pls)
 	{
 		//登记非功能性地点信息时合并隐藏地点
 		foreach($hplsinfo as $hgroup=>$hpls) $plsinfo += $hpls;
@@ -155,7 +163,7 @@ function senditem()
 		$w_log = "<span class=\"lime\">{$name}对你说：“{$message}”</span><br>";
 		if(!$edata['type']){logsave($edata['pid'],$now,$w_log,'c');}
 	}
-	
+
 	if($command != 'back')
 	{
 		$itmn = substr($command, 3);
@@ -186,7 +194,7 @@ function senditem()
 
 		for($i = 1;$i <= 6; $i++)
 		{
-			if(!$edata['itms'.$i]) 
+			if(!$edata['itms'.$i])
 			{
 				$edata['itm'.$i] = $itm;
 				$edata['itmk'.$i] = $itmk;
@@ -197,7 +205,7 @@ function senditem()
 				$log .= "你将<span class=\"yellow\">{$edata['itm'.$i]}</span>送给了<span class=\"yellow\">$w_name</span>。<br>";
 				$w_log = "<span class=\"yellow\">$name</span>将<span class=\"yellow\">{$edata['itm'.$i]}</span>送给了你。";
 				if(!$w_type){logsave($w_pid,$now,$w_log,'t');}
-				
+
 				addnews($now,'senditem',$name,$w_name,$itm,$nick);
 				//w_save($w_pid);
 				player_save($edata);

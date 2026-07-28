@@ -23,7 +23,7 @@ function smartmix_create_recipe_quest($itm,$tp=0,&$data=NULL)
 function smartmix_find_recipe($itm, $tp=0)
 {
 	include_once GAME_ROOT.'./include/game/itemmix.func.php';
-	$mix_res = array();		
+	$mix_res = array();
 	$itm = htmlspecialchars_decode(itemmix_name_proc($itm));
 	$mixinfo = get_mixinfo();
 	foreach ($mixinfo as $ma)
@@ -52,7 +52,7 @@ function smartmix_check_available($data)
 	}
 	//生成道具序号的全组合
 	$fc = full_combination($packn, 2);
-	
+
 	//所有的组合全部判断一遍是否可以合成，最简单粗暴和兼容
 	$mix_available = $mix_overlay_available = $mix_sync_available = array();
 	foreach($fc as $fcval){
@@ -102,7 +102,7 @@ function init_itemmix_tips($itemindex='',&$data=NULL)
 	$mhint = ''; $smhint = '';
 	if(!empty($itemindex))
 	{
-		$mix_res = smartmix_find_recipe($itemindex, 1 + 2);				
+		$mix_res = smartmix_find_recipe($itemindex, 1 + 2);
 		if($mix_res){
 			$smhint .= '<span class="blueseed b">'.$itemindex.'</span>涉及的合成公式：<br><ul>';
 			foreach($mix_res as $mval){
@@ -119,7 +119,7 @@ function init_itemmix_tips($itemindex='',&$data=NULL)
 			}
 			$smhint .= "</ul>";
 		}
-		else 
+		else
 		{
 			$smhint .= '没有找到<span class="blueseed b">'.$itemindex.'</span>的相关合成公式<span class="grey">（不会显示隐藏公式）</span>';
 		}
@@ -146,8 +146,8 @@ function init_itemmix_tips($itemindex='',&$data=NULL)
 					$mstuff = $mresult = '';
 				}
 				$o_type = $mval['type'];
-				if(!$mstuff) {//配方只显示1次					
-					sort($mval['stuff']);			
+				if(!$mstuff) {//配方只显示1次
+					sort($mval['stuff']);
 					foreach($mval['stuff'] as $ms){
 						$mstuff .= parse_smartmix_recipelink($ms).' + ';
 					}
@@ -167,7 +167,7 @@ function init_itemmix_tips($itemindex='',&$data=NULL)
 	for($i=0;$i<=6;$i++)
 	{
 		$itemindex = ${'itm'.$i};
-		$mix_res = smartmix_find_recipe($itemindex, 1 + 2);				
+		$mix_res = smartmix_find_recipe($itemindex, 1 + 2);
 		if($mix_res){
 			$smhint .= '<span class="blueseed b">'.$itemindex.'</span>涉及的合成公式：<br><ul>';
 			foreach($mix_res as $mval){
@@ -185,7 +185,7 @@ function init_itemmix_tips($itemindex='',&$data=NULL)
 			$smhint .= "</ul>";
 		}
 	}
-	if(!empty($smhint)) 
+	if(!empty($smhint))
 	{
 		//$smhint = "<span class=\"b\">素材不足：</span><br>".$smhint;
 		$mhint .= $smhint;
@@ -215,7 +215,7 @@ function get_npc_helpinfo($nlist,$tooltip=1)
 	$tnlist = $nlist;
 	foreach ($tnlist as $i => $npcs)
 	{
-		if(!empty($npcs)) 
+		if(!empty($npcs))
 		{
 			foreach(Array('sub','asub','esub') as $tsub)
 			{
@@ -234,7 +234,7 @@ function get_npc_helpinfo($nlist,$tooltip=1)
 								{
 									$snpc['skill'] .= '(?)';
 								}
-								else 
+								else
 								{
 									$snpc['skill'] = '不定';
 								}
@@ -245,7 +245,7 @@ function get_npc_helpinfo($nlist,$tooltip=1)
 						{
 							$snpc['gd'] = $snpc['gd']=='m' ? '男' : '女';
 						}
-						else 
+						else
 						{
 							$snpc['gd'] = '未知';
 						}
@@ -266,17 +266,17 @@ function get_npc_helpinfo($nlist,$tooltip=1)
 								{
 									$snpc['pls'] = '原地';
 								}
-								else 
+								else
 								{
 									$snpc['pls'] = $snpc['pls']==99 ? '随机' : $plsinfo[$snpc['pls']];
 								}
-							}							
+							}
 						}
 						if(isset($snpc['pose']))$snpc['poseinfo'] = "<span tooltip=\"{$posetips[$snpc['pose']]}\">".$poseinfo[$snpc['pose']]."</span>";
 						if(isset($snpc['tactic']))$snpc['tacinfo'] = "<span tooltip=\"{$tactips[$snpc['tactic']]}\">".$tacinfo[$snpc['tactic']]."</span>";
 						if(isset($snpc['club'])) $snpc['club'] = $snpc['club']==99 ? '第一形态' : $clubinfo[$snpc['club']];
 						//格式化装备、道具名
-						foreach (Array('wep','arb','arh','ara','arf','art','itm0','itm1','itm2','itm3','itm4','itm5','itm6') as $value) 
+						foreach (Array('wep','arb','arh','ara','arf','art','itm0','itm1','itm2','itm3','itm4','itm5','itm6') as $value)
 						{
 							if(strpos($value,'itm')!==false)
 							{
@@ -285,7 +285,7 @@ function get_npc_helpinfo($nlist,$tooltip=1)
 								$s_value = str_replace('itm','itms',$value);
 								$sk_value = str_replace('itm','itmsk',$value);
 							}
-							else 
+							else
 							{
 								$e_value = $value.'e';
 								$k_value = $value.'k';
@@ -297,7 +297,10 @@ function get_npc_helpinfo($nlist,$tooltip=1)
 								//添加tooltip效果
 								if($tooltip)
 								{
-									if(!empty($snpc[$value])) $snpc[$value] = parse_nameinfo_desc($snpc[$value]);
+									if(!empty($snpc[$value])) {
+										$para_value = $value.'para';
+										$snpc[$value] = parse_nameinfo_desc($snpc[$value], '', '', '', isset($snpc[$para_value]) ? $snpc[$para_value] : '', $snpc[$k_value]);
+									}
 									if(!empty($snpc[$sk_value])) $snpc[$sk_value.'_words'] = parse_skinfo_desc($snpc[$sk_value],$snpc[$k_value]);
 									if(!empty($snpc[$k_value])) $snpc[$k_value] = parse_kinfo_desc($snpc[$k_value]);
 								}
@@ -323,7 +326,7 @@ function get_item_place($which)
 	$file = config('mapitem',$gamecfg);
 	$itemlist = openfile($file);
 	$in = sizeof($itemlist);
-	for($i = 1; $i < $in; $i++) 
+	for($i = 1; $i < $in; $i++)
 		if(!empty($itemlist[$i]) && strpos($itemlist[$i],',')!==false)
 		{
 			list($iarea,$imap,$inum,$iname,$ikind,$ieff,$ista,$iskind) = explode(',',$itemlist[$i]);
@@ -421,7 +424,7 @@ function get_item_place($which)
 						break;
 					}
 				}
-			}				
+			}
 		}
 	}*/
 	//NPC掉落
@@ -470,7 +473,7 @@ function get_item_npcdrop($which)
 	{
 		foreach(array('wep','arb','arh','ara','arf','art','itm1','itm2','itm3','itm4','itm5','itm6') as $nipval)
 		{
-			if(!empty($npcs['sub'])) 
+			if(!empty($npcs['sub']))
 			{
 				foreach($npcs['sub'] as $npc)
 				{

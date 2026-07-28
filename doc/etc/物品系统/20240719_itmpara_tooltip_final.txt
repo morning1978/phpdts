@@ -1,0 +1,80 @@
+2024年7月19日 $itmpara 字段 tooltip 功能最终实现记录
+
+## 功能概述
+
+实现了 $itmpara 字段在 tooltip 中的显示功能，使玩家能够看到物品的特殊属性，如伤害增加、防御增加等。同时，添加了调试功能，方便开发者查看 itmpara 字段的解析过程和结果。
+
+## 实现细节
+
+1. 创建了 `itmpara_tooltip.func.php` 文件，包含以下函数：
+   - `parse_itmpara_tooltip($itmpara, $item_type = '')` - 解析 itmpara 字段并生成 tooltip 内容
+   - `add_itmpara_tooltip_to_item($item_name, $itmpara, $item_type = '', $existing_tooltip = '')` - 为物品名称添加 tooltip
+   - `get_itmpara($para)` - 将 itmpara 字符串转换为数组
+
+2. 修改了 `global.func.php` 文件，在 `parse_nameinfo_desc` 函数中添加了对 itmpara tooltip 的支持：
+   ```php
+   // 解析 itmpara tooltip
+   $tooltip_content = parse_itmpara_tooltip($itmpara, $itmk);
+
+   // 如果有 itmpara tooltip，添加到现有 tooltip
+   if(!empty($tooltip_content))
+   {
+       if(!empty($info_tp)) $info_tp .= "\r";
+       $info_tp .= $tooltip_content;
+   }
+   ```
+
+3. 添加了调试功能：
+   - 详细的调试信息，显示 itmpara 的解析过程和结果
+   - 调试信息仅在玩家的 $clbpara['SetItmparaDebug'] 为 true 时显示
+   - 添加了 "itmpara调试开关" 物品，用于切换调试模式
+
+4. 添加了默认的 itmpara 配置：
+   ```php
+   $itmpara_tooltip = array(
+       'AddDamageRaw' => array(
+           'title' => '最终伤害增加',
+           'format' => '{value}',
+           'suffix' => '',
+           'color' => 'red',
+           'condition' => function($item_type, $value) { return true; }
+       ),
+       'AddDamagePercentage' => array(
+           'title' => '最终伤害增加',
+           'format' => '{value}',
+           'suffix' => '%',
+           'color' => 'red',
+           'condition' => function($item_type, $value) { return true; }
+       ),
+       'lore' => array(
+           'title' => '',
+           'format' => '{value}',
+           'suffix' => '',
+           'color' => 'lore',
+           'condition' => function($item_type, $value) { return true; }
+       )
+   );
+   ```
+
+## 使用方法
+
+1. 为物品添加 itmpara 字段：
+   ```php
+   $itmpara = '{"AddDamageRaw":100,"AddDamagePercentage":10,"lore":"这是一件测试用的物品"}';
+   ```
+
+2. 在物品名称中显示 tooltip：
+   ```php
+   $item_name = add_itmpara_tooltip_to_item($item_name, $itmpara, $item_type);
+   ```
+
+3. 开启/关闭调试模式：
+   - 使用 "itmpara调试开关" 物品切换调试模式
+   - 调试模式下，tooltip 中会显示详细的调试信息
+
+## 注意事项
+
+1. itmpara 字段应该是一个有效的 JSON 字符串或数组
+2. 键名大小写不敏感，但建议使用首字母大写的驼峰式命名（如 AddDamageRaw）
+3. 调试信息仅在开启调试模式时显示，不会影响正常玩家的游戏体验
+4. 如果需要添加新的 itmpara 键，需要在配置文件中添加相应的配置

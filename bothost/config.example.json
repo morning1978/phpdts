@@ -1,0 +1,23 @@
+{
+  "report_interval_sec": 15,
+  "targets": [
+    {
+      "name": "demo-server",
+      "revbotservice_url": "https://example.com/path/to/phpdts/bot/revbotservice.php",
+      "workers": 2,
+      "mode": "oneshot",
+      "loop_interval_sec": 2.0,
+      "connect_timeout_sec": 10,
+      "read_timeout_sec": 30,
+      "restart_delay_sec": 2,
+      "disable_env_proxy": true,
+      "insecure_skip_tls_verify": false,
+      "headers": {
+        "User-Agent": "bothost/0.4"
+      },
+      "query": {
+        "respawn_chance": "35"
+      }
+    }
+  ]
+}

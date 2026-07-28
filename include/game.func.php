@@ -19,15 +19,19 @@ function init_playerdata($data=NULL)
 	$upexp = round(($lvl*$baseexp)+(($lvl+1)*$baseexp));
 	$lvlupexp = $upexp - $exp;
 
-	$iconImg = $gd.'_'.$icon.'.gif'; 
-	if(file_exists('img/'.$gd.'_'.$icon.'a.gif')) $iconImgB = $gd.'_'.$icon.'a.gif'; 
+	$iconImg = $gd.'_'.$icon.'.gif';
+	if(file_exists('img/'.$gd.'_'.$icon.'a.gif')) $iconImgB = $gd.'_'.$icon.'a.gif';
 
-	if(($weather == 8)||($weather == 9)||($weather == 12)) 
+	if(($weather == 8)||($weather == 9)||($weather == 12))
 	{
 		$fog = true;
 	}
 
 	$clbpara = get_clbpara($clbpara);
+
+	// RuleSet钩子：在玩家资料完成基础初始化后补充模式专属视图状态。
+	// RuleSet hook: append mode-specific view state after basic player initialization.
+	if(function_exists('ruleset_player_init_hook')) ruleset_player_init_hook($data);
 }
 
 function init_profile($data=NULL)
@@ -42,7 +46,7 @@ function init_profile($data=NULL)
 	}
 	extract($data,EXTR_REFS);
 
-	foreach (Array('wep','arb','arh','ara','arf','art','itm0','itm1','itm2','itm3','itm4','itm5','itm6') as $value) 
+	foreach (Array('wep','arb','arh','ara','arf','art','itm0','itm1','itm2','itm3','itm4','itm5','itm6') as $value)
 	{
 		if(strpos($value,'itm')!==false)
 		{
@@ -50,7 +54,7 @@ function init_profile($data=NULL)
 			$s_value = str_replace('itm','itms',$value);
 			$sk_value = str_replace('itm','itmsk',$value);
 		}
-		else 
+		else
 		{
 			$k_value = $value.'k';
 			$s_value = $value.'s';
@@ -60,7 +64,15 @@ function init_profile($data=NULL)
 		global ${$value.'_words'},${$k_value.'_words'},${$s_value.'_words'},${$sk_value.'_words'};
 
 		# 初始化名称样式
-		${$value.'_words'} = parse_nameinfo_desc($$value,$horizon);
+		// 判断是背包栏物品还是装备栏物品
+		if(strpos($value,'itm')!==false) {
+			// 背包栏物品的 itmpara 字段名称为 itmpara0、itmpara1 等
+			$para_value = 'itmpara'.substr($value, 3);
+		} else {
+			// 装备栏物品的 itmpara 字段名称为 weppara、arbpara 等
+			$para_value = $value.'para';
+		}
+		${$value.'_words'} = parse_nameinfo_desc($$value, $horizon, '', '', isset($$para_value) ? $$para_value : '', $$k_value);
 		# 初始化类别样式
 		${$k_value.'_words'} = parse_kinfo_desc($$k_value,$$sk_value);
 		# 初始化属性样式
@@ -77,7 +89,7 @@ function init_profile($data=NULL)
 	} elseif($hp <= $mhp*0.5){
 		$hpcolor = 'yellow';
 	}
-	
+
 	if($sp <= $msp*0.2){
 		$spcolor = 'grey';
 	} elseif($sp <= $msp*0.5){
@@ -85,7 +97,7 @@ function init_profile($data=NULL)
 	} else {
 		$spcolor = 'clan';
 	}
-	
+
 	$newhppre = 5+floor(151*(1-$hp/$mhp));
 	$newhpimg = '<img src="img/red2.gif" style="position:absolute; clip:rect('.$newhppre.'px,55px,160px,0px);">';
 	$newsppre = 5+floor(151*(1-$sp/$msp));
@@ -125,7 +137,7 @@ function init_bgm($force_update=0)
 {
 	global $command,$gamecfg,$bgmname;
 	global $default_volume,$event_bgm,$pls_bgm,$parea_bgm,$regular_bgm,$bgmbook,$bgmlist;
-	
+
 	global $pdata;
 	extract($pdata,EXTR_REFS);
 	$clbpara = get_clbpara($clbpara);
@@ -170,7 +182,7 @@ function init_bgm($force_update=0)
 	# 刷新页面或输入强制重载参数时，重载播放器
 	if($command == 'enter' || $force_update)
 	{
-		$booklist = $bgmarr = Array();	
+		$booklist = $bgmarr = Array();
 		# 为播放列表中的曲集关联对应BGM名、链接与种类
 		foreach($clbpara['bgmbook'] as $book)
 		{
@@ -240,7 +252,7 @@ function init_mapdata(){
 		$mpp[$position[0]][$position[1]]=$i;
 	}
 
-	$mapcontent = '<TABLE border="1" cellspacing="0" cellpadding="0" background="map/neomap.jpg" style="background-size:478px 418px;position:relative;background-repeat:no-repeat;background-position:right bottom;">';	
+	$mapcontent = '<TABLE border="1" cellspacing="0" cellpadding="0" background="map/neomap.jpg" style="background-size:478px 418px;position:relative;background-repeat:no-repeat;background-position:right bottom;">';
 	$mapcontent .= '<TR align="center"><TD colspan="11" height="24" class=b1 align=center>战场地图</TD></TR>';
 	$mapcontent .= '<TR align="center">
 			<TD width="42" height="36" class=map align=center><div class=nttx>坐标</div></TD>';
@@ -312,15 +324,15 @@ function check_add_searchmemory($id,$itp,$nm,&$data=NULL)
 			{
 				if($sm[0] == $id && $sm[1] == $itp)
 				{
-					$log .= "<span class='grey'>{$nm_desc}本来就在你的视野里，不过这回你对它的印象更深了。</span><br>"; 
+					$log .= "<span class='grey'>{$nm_desc}本来就在你的视野里，不过这回你对它的印象更深了。</span><br>";
 					lost_searchmemory($sid,$data);
 					$flag = 1;
 					break;
 				}
 			}
-		}		
+		}
 		array_push($data['clbpara']['smeo'], Array($id,$itp,$nm));
-		if(!$flag) $log .= "<span class='grey'>你设法将{$nm_desc}保持在视野范围内。</span><br>"; 
+		if(!$flag) $log .= "<span class='grey'>你设法将{$nm_desc}保持在视野范围内。</span><br>";
 	}
 	return;
 }
@@ -365,7 +377,7 @@ function get_remaincdtime($pid){
 		return floor($rmtime);
 	}else{
 		return 0;
-	}	
+	}
 }
 
 // 检查时效性技能是否达到时限
@@ -388,7 +400,7 @@ function check_skilllasttimes(&$data)
 				{
 					$log.="<span class='yellow'>「{$sk_name}」</span>的效果结束了！<br>";
 				}
-				else 
+				else
 				{
 					$log.="{$nm}从<span class='yellow'>「{$sk_name}」</span>状态中恢复了！<br>";
 				}
@@ -509,7 +521,7 @@ function get_safe_plslist($mode=1)
 
 /*function w_save($id){
 	global $db,$tablepre,$w_name,$w_pass,$w_type,$w_endtime,$w_deathtime,$w_gd,$w_sNo,$w_icon,$w_club,$w_hp,$w_mhp,$w_sp,$w_msp,$w_att,$w_def,$w_pls,$w_lvl,$w_exp,$w_money,$w_bid,$w_inf,$w_rage,$w_pose,$w_tactic,$w_killnum,$w_state,$w_wp,$w_wk,$w_wg,$w_wc,$w_wd,$w_wf,$w_teamID,$w_teamPass,$w_wep,$w_wepk,$w_wepe,$w_weps,$w_arb,$w_arbk,$w_arbe,$w_arbs,$w_arh,$w_arhk,$w_arhe,$w_arhs,$w_ara,$w_arak,$w_arae,$w_aras,$w_arf,$w_arfk,$w_arfe,$w_arfs,$w_art,$w_artk,$w_arte,$w_arts,$w_itm0,$w_itmk0,$w_itme0,$w_itms0,$w_itm1,$w_itmk1,$w_itme1,$w_itms1,$w_itm2,$w_itmk2,$w_itme2,$w_itms2,$w_itm3,$w_itmk3,$w_itme3,$w_itms3,$w_itm4,$w_itmk4,$w_itme4,$w_itms4,$w_itm5,$w_itmk5,$w_itme5,$w_itms5,$w_itm6,$w_itmk6,$w_itme6,$w_itms6,$w_wepsk,$w_arbsk,$w_arhsk,$w_arask,$w_arfsk,$w_artsk,$w_itmsk0,$w_itmsk1,$w_itmsk2,$w_itmsk3,$w_itmsk4,$w_itmsk5,$w_itmsk6,$w_rp,$w_action,$w_achievement,$w_skillpoint;
-	
+
 	$db->query("UPDATE {$tablepre}players SET name='$w_name',pass='$w_pass',type='$w_type',endtime='$w_endtime',deathtime='$w_deathtime',gd='$w_gd',sNo='$w_sNo',icon='$w_icon',club='$w_club',hp='$w_hp',mhp='$w_mhp',sp='$w_sp',msp='$w_msp',att='$w_att',def='$w_def',pls='$w_pls',lvl='$w_lvl',exp='$w_exp',money='$w_money',bid='$w_bid',inf='$w_inf',rage='$w_rage',pose='$w_pose',tactic='$w_tactic',state='$w_state',killnum='$w_killnum',action='$w_action',wp='$w_wp',wk='$w_wk',wg='$w_wg',wc='$w_wc',wd='$w_wd',wf='$w_wf',teamID='$w_teamID',teamPass='$w_teamPass',wep='$w_wep',wepk='$w_wepk',wepe='$w_wepe',weps='$w_weps',wepsk='$w_wepsk',arb='$w_arb',arbk='$w_arbk',arbe='$w_arbe',arbs='$w_arbs',arbsk='$w_arbsk',arh='$w_arh',arhk='$w_arhk',arhe='$w_arhe',arhs='$w_arhs',arhsk='$w_arhsk',ara='$w_ara',arak='$w_arak',arae='$w_arae',aras='$w_aras',arask='$w_arask',arf='$w_arf',arfk='$w_arfk',arfe='$w_arfe',arfs='$w_arfs',arfsk='$w_arfsk',art='$w_art',artk='$w_artk',arte='$w_arte',arts='$w_arts',artsk='$w_artsk',itm0='$w_itm0',itmk0='$w_itmk0',itme0='$w_itme0',itms0='$w_itms0',itmsk0='$w_itmsk0',itm1='$w_itm1',itmk1='$w_itmk1',itme1='$w_itme1',itms1='$w_itms1',itmsk1='$w_itmsk1',itm2='$w_itm2',itmk2='$w_itmk2',itme2='$w_itme2',itms2='$w_itms2',itmsk2='$w_itmsk2',itm3='$w_itm3',itmk3='$w_itmk3',itme3='$w_itme3',itms3='$w_itms3',itmsk3='$w_itmsk3',itm4='$w_itm4',itmk4='$w_itmk4',itme4='$w_itme4',itms4='$w_itms4',itmsk4='$w_itmsk4',itm5='$w_itm5',itmk5='$w_itmk5',itme5='$w_itme5',itms5='$w_itms5',itmsk5='$w_itmsk5',itm6='$w_itm6',itmk6='$w_itmk6',itme6='$w_itme6',itms6='$w_itms6',itmsk6='$w_itmsk6',rp='$w_rp',achievement='$w_achievement',skillpoint='$w_skillpoint'    WHERE pid='$id'");
 	//$db->query("UPDATE {$tablepre}players SET name='$w_name',pass='$w_pass',type='$w_type',endtime='$w_endtime',gd='$w_gd',sNo='$w_sNo',icon='$w_icon',club='$w_club',hp='$w_hp',mhp='$w_mhp',sp='$w_sp',msp='$w_msp',att='$w_att',def='$w_def',pls='$w_pls',lvl='$w_lvl',exp='$w_exp',money='$w_money',bid='$w_bid',inf='$w_inf',rage='$w_rage',pose='$w_pose',tactic='$w_tactic',state='$w_state',killnum='$w_killnum',wp='$w_wp',wk='$w_wk',wg='$w_wg',wc='$w_wc',wd='$w_wd',wf='$w_wf',teamID='$w_teamID',teamPass='$w_teamPass',wep='$w_wep',wepk='$w_wepk',wepe='$w_wepe',weps='$w_weps',wepsk='$w_wepsk',arb='$w_arb',arbk='$w_arbk',arbe='$w_arbe',arbs='$w_arbs',arbsk='$w_arbsk',arh='$w_arh',arhk='$w_arhk',arhe='$w_arhe',arhs='$w_arhs',arhsk='$w_arhsk',ara='$w_ara',arak='$w_arak',arae='$w_arae',aras='$w_aras',arask='$w_arask',arf='$w_arf',arfk='$w_arfk',arfe='$w_arfe',arfs='$w_arfs',arfsk='$w_arfsk',art='$w_art',artk='$w_artk',arte='$w_arte',arts='$w_arts',artsk='$w_artsk',itm0='$w_itm0',itmk0='$w_itmk0',itme0='$w_itme0',itms0='$w_itms0',itmsk0='$w_itmsk0',itm1='$w_itm1',itmk1='$w_itmk1',itme1='$w_itme1',itms1='$w_itms1',itmsk1='$w_itmsk1',itm2='$w_itm2',itmk2='$w_itmk2',itme2='$w_itme2',itms2='$w_itms2',itmsk2='$w_itmsk2',itm3='$w_itm3',itmk3='$w_itmk3',itme3='$w_itme3',itms3='$w_itms3',itmsk3='$w_itmsk3',itm4='$w_itm4',itmk4='$w_itmk4',itme4='$w_itme4',itms4='$w_itms4',itmsk4='$w_itmsk4',itm5='$w_itm5',itmk5='$w_itmk5',itme5='$w_itme5',itms5='$w_itms5',itmsk5='$w_itmsk5',itm6='$w_itm6',itmk6='$w_itmk6',itme6='$w_itme6',itms6='$w_itms6',itmsk6='$w_itmsk6' WHERE pid='$id'");
 
@@ -526,12 +538,12 @@ function w_save2(&$data){
 	return;
 }*/
 
-function addnoise($wp_kind, $wsk, $ntime, $npls, $nid1, $nid2, $nmode) 
+function addnoise($wp_kind, $wsk, $ntime, $npls, $nid1, $nid2, $nmode)
 {
 	//在隐藏地图内不会传出声音信息
 	global $plsinfo;
 	if(!array_key_exists($npls,$plsinfo)) return;
-	
+
 	if ((($wp_kind == 'G') && (strpos ( $wsk, 'S' ) === false)) || ($wp_kind == 'F')) {
 		global $noisetime, $noisepls, $noiseid, $noiseid2, $noisemode;
 		$noisetime = $ntime;
@@ -585,7 +597,7 @@ function npc_changewep_rev(&$pa,&$pd,$acitve)
 	if(!$pa['type'] || $pa['club'] != 98) return;
 
 	$dice = diceroll(99);
-	
+
 	if($dice > 50)
 	{
 		$weplist = Array();
@@ -640,15 +652,15 @@ function npc_changewep_rev(&$pa,&$pd,$acitve)
 				}
 				if(count($minus) < count($weplist)){
 					$weplist = array_diff($weplist,$minus);
-				}				
+				}
 			}
 		}
-		else 
+		else
 		{
 			//没有获取到可换装列表，直接返回
 			return;
 		}
-		
+
 		if(!empty($weplist))
 		{
 			$oldwep = $pa['wep'];
@@ -673,28 +685,28 @@ function npc_changewep_rev(&$pa,&$pd,$acitve)
 
 # NPC喊话
 # pa指npc pd指另一视角
-function npc_chat_rev(&$pa,&$pd,$mode='') 
+function npc_chat_rev(&$pa,&$pd,$mode='')
 {
 	global $npcchat;
-	if(!empty($npcchat[$pa['type']][$pa['name']])) 
+	if(!empty($npcchat[$pa['type']][$pa['name']]))
 	{
 		$nchat = $npcchat[$pa['type']][$pa['name']];
 		$chatcolor = $nchat['color'];
 		$npcwords = !empty($chatcolor) ? "<span class = \"{$chatcolor}\">" : '<span>';
-		switch ($mode) 
+		switch ($mode)
 		{
 			case 'attack' :
-				if (empty($pa['itmsk0'])) 
+				if (empty($pa['itmsk0']))
 				{
 					$npcwords .= "{$nchat[0]}";
 					$pa['itmsk0'] = 1;
 				}
-				elseif ($pa['hp'] > ($pa['mhp'] / 2)) 
+				elseif ($pa['hp'] > ($pa['mhp'] / 2))
 				{
 					$dice = rand ( 1, 2 );
 					$npcwords .= "{$nchat[$dice]}";
-				} 
-				else 
+				}
+				else
 				{
 					$dice = rand ( 3, 4 );
 					$npcwords .= "{$nchat[$dice]}";
@@ -706,12 +718,12 @@ function npc_chat_rev(&$pa,&$pd,$mode='')
 					$npcwords .= "{$nchat[0]}";
 					$pa['itmsk0'] = 1;
 				}
-				elseif($pa['hp'] > ($pa['mhp'] / 2)) 
+				elseif($pa['hp'] > ($pa['mhp'] / 2))
 				{
 					$dice = rand ( 5, 6 );
 					$npcwords .= "{$nchat[$dice]}";
-				} 
-				else 
+				}
+				else
 				{
 					$dice = rand ( 7, 8 );
 					$npcwords .= "{$nchat[$dice]}";
@@ -735,22 +747,22 @@ function npc_chat_rev(&$pa,&$pd,$mode='')
 		}
 		$npcwords .= '</span><br>';
 		return $npcwords;
-	} 
-	elseif ($mode == 'death') 
+	}
+	elseif ($mode == 'death')
 	{
 		global $lwinfo;
-		if (is_array($lwinfo[$pa['type']])) 
+		if (is_array($lwinfo[$pa['type']]))
 		{
 			$lastword = $lwinfo[$pa['type']][$pa['name']];
-		} 
-		else 
+		}
+		else
 		{
 			$lastword = $lwinfo[$pa['type']];
 		}
 		$npcwords = "<span class=\"yellow\">“{$lastword}”</span><br>";
 		return $npcwords;
 	}
-	else 
+	else
 	{
 		return;
 	}

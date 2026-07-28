@@ -5,7 +5,7 @@ require './include/common.inc.php';
 require GAME_ROOT.'./include/game.func.php';
 
 
-if(!$cuser||!$cpass) { gexit($_ERROR['no_login'],__file__,__line__); } 
+if(!$cuser||!$cpass) { gexit($_ERROR['no_login'],__file__,__line__); }
 if(isset($mode) && $mode == 'quit') {
 
 	gsetcookie('user','');
@@ -41,13 +41,20 @@ $pdata['clbpara'] = get_clbpara($pdata['clbpara']);
 //Also copying for $weppara, $itmpara and such.
 $pdata['weppara'] = get_itmpara($pdata['weppara']);
 $pdata['wep2para'] = get_itmpara($pdata['wep2para']);
-$pdata['itm0para'] = get_itmpara($pdata['itm0para']);
-$pdata['itm1para'] = get_itmpara($pdata['itm1para']);
-$pdata['itm2para'] = get_itmpara($pdata['itm2para']);
-$pdata['itm3para'] = get_itmpara($pdata['itm3para']);
-$pdata['itm4para'] = get_itmpara($pdata['itm4para']);
-$pdata['itm5para'] = get_itmpara($pdata['itm5para']);
-$pdata['itm6para'] = get_itmpara($pdata['itm6para']);
+//$pdata['itm0para'] = get_itmpara($pdata['itm0para']);
+//$pdata['itm1para'] = get_itmpara($pdata['itm1para']);
+//$pdata['itm2para'] = get_itmpara($pdata['itm2para']);
+//$pdata['itm3para'] = get_itmpara($pdata['itm3para']);
+//$pdata['itm4para'] = get_itmpara($pdata['itm4para']);
+//$pdata['itm5para'] = get_itmpara($pdata['itm5para']);
+//$pdata['itm6para'] = get_itmpara($pdata['itm6para']);
+$pdata['itmpara0'] = get_itmpara($pdata['itmpara0']);
+$pdata['itmpara1'] = get_itmpara($pdata['itmpara1']);
+$pdata['itmpara2'] = get_itmpara($pdata['itmpara2']);
+$pdata['itmpara3'] = get_itmpara($pdata['itmpara3']);
+$pdata['itmpara4'] = get_itmpara($pdata['itmpara4']);
+$pdata['itmpara5'] = get_itmpara($pdata['itmpara5']);
+$pdata['itmpara6'] = get_itmpara($pdata['itmpara6']);
 $pdata['arbpara'] = get_itmpara($pdata['arbpara']);
 $pdata['arhpara'] = get_itmpara($pdata['arhpara']);
 $pdata['arapara'] = get_itmpara($pdata['arapara']);
@@ -63,6 +70,9 @@ $log = '';
 $chatdata = getchat(0,$teamID);
 //读取表情信息
 $emdata = get_emdata();
+
+
+
 //读取玩家互动信息
 $result = $db->query("SELECT lid,time,log FROM {$tablepre}log WHERE toid = '$pid' AND prcsd = 0 ORDER BY time,lid");
 $llist = '';
@@ -99,6 +109,37 @@ if($hp <= 0){
 		$result = $db->query("SELECT name FROM {$tablepre}players WHERE pid='$bid'");
 		if($db->num_rows($result)) { $kname = $db->result($result,0); }
 	}
+
+	// 检查是否需要显示RuleSet结束剧情
+	if(isset($groomid) && empty($clbpara['ruleset_ending_shown'])) {
+		$room_id = intval($groomid);
+		$result = $db->query("SELECT gruleset FROM {$gtablepre}game WHERE groomid = {$room_id}");
+		if ($db->num_rows($result)) {
+			$room_data = $db->fetch_array($result);
+			$ruleset_id = $room_data['gruleset'];
+			if (!empty($ruleset_id)) {
+				include_once GAME_ROOT.'./gamedata/ruleset/story_config.php';
+				$story = get_ruleset_story($ruleset_id, 'ending');
+				if ($story) {
+					// 标记结束剧情已显示
+					$clbpara['ruleset_ending_shown'] = true;
+					$db->query("UPDATE {$tablepre}players SET clbpara='".json_encode($clbpara, JSON_UNESCAPED_UNICODE)."' WHERE name='$cuser'");
+
+					// 设置结束剧情显示
+					$opendialog = 'ruleset_ending';
+					$dialogue_id = 'ruleset_ending';
+
+					// 动态添加RuleSet结束剧情到对话系统
+					global $dialogues, $dialogue_log;
+					$dialogues['ruleset_ending'] = array(
+						0 => $story['content']
+					);
+					$dialogue_log['ruleset_ending'] = "<span class='red'>※ 时光重现结束</span><br>{$story['title']}<br><br>";
+				}
+			}
+		}
+	}
+
 	$mode = 'death';
 } elseif($state ==1 || $state == 2 || $state == 3){
 	$mode = 'rest';
@@ -121,7 +162,7 @@ if($action == 'corpse' || $action == 'pacorpse' && $gamestate<40){
 			init_battle_rev($pdata,$edata,1);
 			$main = 'battle_rev';
 		}
-	}	
+	}
 }
 elseif($action == 'chase' || $action == 'pchase' || $action == 'dfight'){
 	$enemyid = $bid;
@@ -145,7 +186,7 @@ elseif($action == 'neut'){
 			init_battle_rev($pdata,$edata,1);
 			$main = 'battle_rev';
 		}
-	}	
+	}
 }
 if($hp > 0 && $coldtimeon && $showcoldtimer && $rmcdtime){$log .= "行动冷却时间：<span id=\"timer\" class=\"yellow\">0.0</span>秒<script type=\"text/javascript\">demiSecTimerStarter($rmcdtime);</script><br>";}
 //如果身上存在时效性技能，检查技能是否超时
@@ -173,18 +214,60 @@ if ($club==0)
 	getclub($name,$c1,$c2,$c3);
 	$clubavl[0]=0; $clubavl[1]=$c1; $clubavl[2]=$c2; $clubavl[3]=$c3;
 }
-if(!empty($clbpara['dialogue']) || !empty($clbpara['noskip_dialogue']))
+// 检查是否有对话需要显示，但如果刚刚处理了对话选择，则不显示
+// 通过检查 $_POST['command'] 是否包含 'dialogue_choice' 来判断
+$just_made_choice = isset($_POST['command']) && strpos($_POST['command'], 'dialogue_choice') === 0;
+
+// 检查是否有RuleSet开场剧情需要显示
+if(!$just_made_choice && !empty($clbpara['ruleset_opening_story']) && empty($clbpara['ruleset_story_shown']))
 {
-	$opendialog = $clbpara['noskip_dialogue'];
-	if(!empty($clbpara['dialogue'])) $dialogue_id = $clbpara['dialogue'];
+	// 标记剧情已显示，避免重复显示
+	$clbpara['ruleset_story_shown'] = true;
+	$db->query("UPDATE {$tablepre}players SET clbpara='".json_encode($clbpara, JSON_UNESCAPED_UNICODE)."' WHERE name='$cuser'");
+
+	// 显示RuleSet剧情
+	$opendialog = 'ruleset_opening';
+	$dialogue_id = 'ruleset_opening';
+
+	// 动态添加RuleSet剧情到对话系统
+	include_once GAME_ROOT.'./gamedata/ruleset/story_config.php';
+	$room_id = intval($groomid);
+	$result = $db->query("SELECT gruleset FROM {$gtablepre}game WHERE groomid = {$room_id}");
+	if ($db->num_rows($result)) {
+		$room_data = $db->fetch_array($result);
+		$ruleset_id = $room_data['gruleset'];
+		if (!empty($ruleset_id)) {
+			$story = get_ruleset_story($ruleset_id, 'opening');
+			if ($story) {
+				// 将RuleSet剧情内容注入到对话系统
+				global $dialogues, $dialogue_log;
+				$dialogues['ruleset_opening'] = array(
+					0 => $story['content']
+				);
+				$dialogue_log['ruleset_opening'] = "<span class='lime'>※ 时光重现开始！</span><br>欢迎来到{$story['title']}的世界。<br><br>";
+			}
+		}
+	}
+}
+elseif(!$just_made_choice && (!empty($clbpara['dialogue']) || !empty($clbpara['noskip_dialogue'])))
+{
+	if(!empty($clbpara['dialogue'])) {
+		$opendialog = 'dialogue';
+		$dialogue_id = $clbpara['dialogue'];
+	} else {
+		$opendialog = $clbpara['noskip_dialogue'];
+	}
 }
 if(isset($opendialog))
 {
 	$log.="<script>
-	$('{$opendialog}').showModal();
+	var dialogElement = document.getElementById('{$opendialog}');
+	if(dialogElement && dialogElement.showModal) {
+		dialogElement.showModal();
+	}
 	</script>";
 }
-	
+
 //if (!strstr($_SERVER['HTTP_REFERER'], 'php') && $_SERVER['HTTP_REFERER'] != '') {
 if (isset($_GET['is_new'])) {
 	include './api.php';

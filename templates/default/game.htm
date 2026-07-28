@@ -4,6 +4,9 @@
 	<!--{eval $bgm = init_bgm(1)}-->
 	$bgm
 </div>
+<script type="text/javascript">
+	var CURSCRIPT = 'game';
+</script>
 <!--{eval $bgurl = "img/location/".$pls.".jpg";}-->
 <!--{if $horizon}-->
 	<style>
@@ -48,7 +51,7 @@
 						<div>
 							<!--{if !isset($plsinfo[$pls]) && isset($hplsinfo[$pgroup])}-->
 								<span class="yellow" id="pls">$hplsinfo[$pgroup][$pls]</span>
-							<!--{else}--> 
+							<!--{else}-->
 								<span class="yellow" id="pls">$plsinfo[$pls]</span>
 							<!--{/if}-->
 							【<span class="red">剩余：<span id="anum">$alivenum</span>人</span>】
@@ -72,7 +75,7 @@
 									<!--{else}-->
 									{template command}
 									<!--{/if}-->
-								</div>						
+								</div>
 							</form>
 						</div>
 					</td>
@@ -86,4 +89,5 @@
 		</td>
 	</tr>
 </table>
+{template slidingpanel}
 {template footer}

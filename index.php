@@ -31,7 +31,17 @@ if(!empty($roomact))
 
 	if($roomact == 'create')
 	{
-		roommng_create_new_room($udata);
+		$ruleset_id = isset($ruleset) ? $ruleset : '';
+		roommng_create_new_room($udata, $ruleset_id);
+	}
+	elseif($roomact == 'create_ruleset')
+	{
+		$ruleset_id = isset($ruleset) ? $ruleset : '';
+		if (empty($ruleset_id)) {
+			$rerror = 'invalid_ruleset';
+			goto roommng_flag;
+		}
+		roommng_create_new_room($udata, $ruleset_id);
 	}
 	elseif(strpos($roomact,'join') !== false)
 	{
@@ -60,12 +70,39 @@ else
   if (isset($_GET['is_new'])) {
     $now_rooms = !empty($roomlist) ? count($roomlist) : 0;
     $rooms = array();
+
+    // 加载RuleSet配置
+    include_once GAME_ROOT.'./gamedata/ruleset/ruleset_config.php';
+    $available_rulesets = array();
+    if (get_ruleset_config()) {
+      foreach (get_ruleset_config() as $ruleset_id => $config) {
+        if (!empty($cuser) && !empty($cpass) && can_create_ruleset_room($ruleset_id, $udata)) {
+          $available_rulesets[] = array(
+            'id' => $ruleset_id,
+            'name' => $config['name'],
+            'description' => $config['description'],
+            'cost' => $config['credits_cost'],
+            'admin_free' => $config['admin_free'] && $udata['groupid'] >= 2
+          );
+        }
+      }
+    }
+
     foreach ($roomlist as $rkey => $rinfo) {
       $room = array();
       $room['id'] = $rkey;
       $room['status'] = $gstate[$rinfo['gamestate']];
       $room['owner'] = $rinfo['groomownid'];
       $room['nums'] = $rinfo['groomnums'];
+
+      // 添加RuleSet信息
+      if (!empty($rinfo['gruleset'])) {
+        $ruleset_config = get_ruleset_config($rinfo['gruleset']);
+        $room['ruleset'] = $ruleset_config ? $ruleset_config['name'] : $rinfo['gruleset'];
+      } else {
+        $room['ruleset'] = '';
+      }
+
       $action = array();
       if (!empty($cuser) && !empty($cpass)) {
         if (!empty($groomid)) {
@@ -124,10 +161,16 @@ else
     "canCreateRoom" => $now_rooms < $max_rooms && !$groomid && (!empty($cuser) && !empty($cpass)),
     // 房间
     "rooms" => $rooms,
+    // 可用的RuleSet
+    "availableRulesets" => $available_rulesets,
+    // RuleSet系统是否启用
+    "rulesetEnabled" => get_ruleset_config() !== false,
 	  // 站长留言
 	  "news" => $adminmsg,
 	  // 用户名
 	  "username" => $cuser,
+	  // 用户切糕数量
+	  "credits2" => !empty($udata) ? $udata['credits2'] : 0,
     ));
     return;
   } else {

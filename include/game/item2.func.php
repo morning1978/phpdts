@@ -139,6 +139,21 @@ function hack($itmn = 0) {
 	$hack_dice = rand(0,99);
 	if(($hack_dice < $hack_obbs)||(($club == 7)&&($hack_dice<95))) {
 		$hack = 1;
+		// 确保 clbpara 是数组
+		if(!is_array($clbpara)) {
+			if(is_string($clbpara)) {
+				$clbpara = json_decode($clbpara, true);
+			}
+			if(!is_array($clbpara)) {
+				$clbpara = array();
+			}
+		}
+		// 确保 achvars 数组存在
+		if(!isset($clbpara['achvars'])) $clbpara['achvars'] = array();
+		// 确保 hack 字段存在且为数字
+		if(!isset($clbpara['achvars']['hack']) || !is_numeric($clbpara['achvars']['hack'])) {
+			$clbpara['achvars']['hack'] = 0;
+		}
 		$clbpara['achvars']['hack'] += 1;
 		$log .= '入侵禁区控制系统成功了！全部禁区都被解除了！<br>';
 		//include_once GAME_ROOT.'./include/system.func.php';

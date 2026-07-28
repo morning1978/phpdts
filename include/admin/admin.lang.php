@@ -257,6 +257,8 @@ $lang = array
 	'templates_clean_comment' => '清空已生成的模板缓存文件',
 	'roommng' => '临时性房间管理',
 	'roommng_comment' => '强制关闭指定编号的房间<br>不能关闭0号大房间（临时功能）',
+	'resourcemng' => '游戏资源管理',
+	'resourcemng_comment' => '管理地图物品/商店/开局物品与NPC配置，支持按RuleSet编辑',
 	
 	'pcmng' => '玩家数据管理',
 	'pcmng_comment' => '修改当前局玩家的各数值，不影响帐号',

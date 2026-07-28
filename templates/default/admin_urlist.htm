@@ -115,6 +115,9 @@
 				<input type="submit" name="submit" value="封停选中玩家" onclick="$('urcmd').value='ban'">
 				<input type="submit" name="submit" value="解封选中玩家" onclick="$('urcmd').value='unban'">
 				<input type="submit" name="submit" value="删除选中玩家" onclick="$('urcmd').value='del'">
+				<!--{if $show_reverse_migration}-->
+				<input type="submit" name="submit" value="反向迁移选中玩家" onclick="$('urcmd').value='reverse_migrate'" style="background-color: #FFE4B5;">
+				<!--{/if}-->
 			</td>
 		</tr>
 		<tr>
@@ -129,6 +132,18 @@
 				<input type="submit" name="submit" value="发送站内邮件" onclick="$('urcmd').value='sendmessage'">
 			</td>
 		</tr>
+		<!--{if $show_reverse_migration}-->
+		<tr>
+			<td colspan=2 style="background-color: #FFE4B5; font-weight: bold;">反向迁移</td>
+			<td colspan=12 style="text-align:center; background-color: #FFF8DC;">
+				远端用户名：
+				<input type="text" name="remote_username" size="15" maxlength="30" placeholder="远端从服务器用户名">&nbsp;&nbsp;&nbsp;
+				远端密码：
+				<input type="password" name="master_password" size="15" maxlength="30" placeholder="远端从服务器密码">&nbsp;&nbsp;&nbsp;
+				<span style="color: #8B4513; font-size: 12px;">注意：将推送选中用户的数据到远端从服务器，需要远端服务器的有效账户进行身份验证</span>
+			</td>
+		</tr>
+		<!--{/if}-->
 		<!--{/if}-->
 	</table>
 	

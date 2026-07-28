@@ -174,7 +174,7 @@ namespace revcombat
 		}
 
 		# 攻击、反击的战斗结果判断均非0时：检查是否触发追击/鏖战事件
-		if($att_result && (!isset($def_result)||!empty($def_result)) && $chase_obbs && $dfight_obbs)
+		if($att_result && (!isset($def_result)||!empty($def_result)) && ($chase_obbs || $dfight_obbs))
 		{
 			check_can_chase($pa,$pd,$active);
 		}
@@ -411,7 +411,7 @@ namespace revcombat
 			{
 				$damage = $fix_dmg;
 				$pa['final_damage'] = $damage;
-				if($damage == 0)  $log .= "<span class=\"yellow\">造成的总伤害：<span class=\"red\">$damage</span>。</span><br>";
+				$log .= "<span class=\"yellow\">造成的总伤害：<span class=\"red\">{$damage}</span>。</span><br>";
 			}
 			//如无，则正常计算伤害
 			else
@@ -618,12 +618,17 @@ namespace revcombat
 		if($pd['hp']<= 0)
 		{
 			# NPC二阶段处理：
-			if($pd['club'] == 99 && $pd['type'])
+			# Adding additional check for 百命猫 here to prevent she coming back if she's killed enough times.
+			if($pd['club'] == 99 && $pd['type'] && $pd['clbpara']['lifedestroyed'] < 111)
 			{
 				$log .= npc_chat_rev ($pd,$pa, 'death' );
 				include_once GAME_ROOT . './include/system.func.php';
 				$npcdata = evonpc ($pd['type'],$pd['name']);
 				$log .= '<span class="yellow">'.$pd['name'].'却没死去，反而爆发出真正的实力！</span><br>';
+				# add additional logic for 百命猫
+				if($pd['name']=='是TSEROF啦！'){
+					$pd['clbpara']['lifedestroyed'] += 1;
+				}
 				if($npcdata)
 				{
 					addnews($now , 'evonpc',$pd['name'], $npcdata['name'], $pa['name']);
@@ -671,7 +676,8 @@ namespace revcombat
 		else 
 		{
 			# 执行扣血后的战斗结算阶段事件
-			attack_result_events($pa,$pd,$active);
+			$event_flag = attack_result_events($pa,$pd,$active);
+			if($event_flag < 0) return 0;
 		}
 		return 1;
 	}

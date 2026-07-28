@@ -3,6 +3,7 @@
 define('CURSCRIPT', 'login');
 
 require './include/common.inc.php';
+require './include/masterslave.func.php';
 
 //error_reporting(E_ERROR);
 //set_magic_quotes_runtime(0);
@@ -118,9 +119,42 @@ $gender = 0;
 
 $result = $db->query("SELECT * FROM {$gtablepre}users WHERE username = '$username'");
 if(!$db->num_rows($result)) {
-	gexit($_ERROR['user_not_exists'],__file__,__line__);
-	//$groupid = 1;
-	//$db->query("INSERT INTO {$gtablepre}users (username,`password`,groupid,ip,credits,gender) VALUES ('$username', '$password', '$groupid', '$onlineip', '$credits', '$gender')");
+	// 如果是从服务器且配置了自动同步，尝试从主数据库同步用户
+	if(should_auto_sync()) {
+		$original_password = '';
+		// 从POST或其他方式获取原始密码
+		foreach($_POST as $key => $value) {
+			if($key == 'password') {
+				$original_password = $value;
+				break;
+			}
+		}
+
+		if($original_password) {
+			$sync_result = sync_user_from_master($username, $original_password, $username);
+			if($sync_result['success']) {
+				// 同步成功，重新查询用户数据
+				$result = $db->query("SELECT * FROM {$gtablepre}users WHERE username = '$username'");
+				if($db->num_rows($result)) {
+					$userdata = $db->fetch_array($result);
+					// 验证密码
+					if($userdata['password'] != $password) {
+						gexit($_ERROR['wrong_pw'],__file__,__line__);
+					}
+					// 添加同步成功的提示信息
+					gsetcookie('sync_message', '账户数据已从主服务器自动同步', 60);
+				} else {
+					gexit($_ERROR['user_not_exists'],__file__,__line__);
+				}
+			} else {
+				gexit($_ERROR['user_not_exists'],__file__,__line__);
+			}
+		} else {
+			gexit($_ERROR['user_not_exists'],__file__,__line__);
+		}
+	} else {
+		gexit($_ERROR['user_not_exists'],__file__,__line__);
+	}
 } else {
 	$userdata = $db->fetch_array($result);
 	if($userdata['groupid'] <= 0){

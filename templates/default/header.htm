@@ -27,7 +27,7 @@ jQuery.noConflict();
 <script type="text/javascript" src="include/record.js"></script>
 <!--{/if}-->
 <!--{loop $plsinfo $places $info}-->
-	<!--{if (CURSCRIPT == 'game' && $sdata['pls']==$places)}-->
+	<!--{if (CURSCRIPT == 'game' && isset($sdata) && isset($sdata['pls']) && $sdata['pls']==$places)}-->
 	<!--{eval $bgurl = "img/location/".$places.".jpg"}-->
 	<style>
 		body {background-image: url("$bgurl");background-position: center;}

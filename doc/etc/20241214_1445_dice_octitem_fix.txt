@@ -1,0 +1,68 @@
+修改时间：2024-12-14 14:45 (NOUVEAU DAY -115)
+修改文件：include/game/item.dice.php, include/game/itemmain.func.php
+修改原因：修复D3、D6骰子和棱镜八面体使用时页面卡住的问题
+
+问题描述：
+玩家汇报在使用D3、D6骰子以及丢弃棱镜八面体时页面会卡住。
+
+错误记录：
+1. [14-Jun-2025 04:08:29 Etc/GMT] PHP Fatal error: Uncaught Error: Call to undefined function fortuneCookie1() in /home2/a23336ht/public_html/dts1/include/game/item.dice.php:26
+2. [14-Jun-2025 04:10:07 Etc/GMT] PHP Fatal error: Uncaught Error: Call to undefined function octitem_rotate() in /home2/a23336ht/public_html/dts1/include/game/itemmain.func.php:626
+
+错误分析：
+1. fortuneCookie1() 函数未定义：
+   - 函数在 include/game/fortune.func.php 中定义
+   - 但在 item.dice.php 中没有包含该文件
+   - 导致调用 fortuneCookie1(diceroll($clbpara['randver1'])) 时出错
+
+2. octitem_rotate() 函数未定义：
+   - 函数在 include/game/item.nachster_booster.php 中定义
+   - 但在 itemmain.func.php 中包含的是 item.func.php
+   - 导致调用 octitem_rotate($theitem, 7) 时出错
+
+修改内容：
+
+1. 修改 include/game/item.dice.php：
+   在文件开头添加必要的包含语句：
+   ```php
+   // Include required function files
+   require_once GAME_ROOT . './include/game/fortune.func.php';
+   require_once GAME_ROOT . './include/game/dice.func.php';
+   ```
+
+2. 修改 include/game/itemmain.func.php 第625行：
+   将：
+   ```php
+   include_once GAME_ROOT . './include/game/item.func.php';
+   ```
+   改为：
+   ```php
+   include_once GAME_ROOT . './include/game/item.nachster_booster.php';
+   ```
+
+修改逻辑：
+1. 确保 item.dice.php 能够访问 fortuneCookie1() 和 diceroll() 函数
+2. 确保 itemmain.func.php 能够访问 octitem_rotate() 函数
+3. 使用 require_once 和 include_once 避免重复包含
+
+预期效果：
+1. 修复D3、D6骰子使用时的PHP致命错误
+2. 修复棱镜八面体丢弃时的PHP致命错误
+3. 恢复骰子和棱镜八面体的正常功能
+
+测试建议：
+1. 测试使用D3骰子是否正常工作
+2. 测试使用D6骰子是否正常工作
+3. 测试丢弃棱镜八面体是否正常工作
+4. 检查其他骰子类型（D10、D20、D40、D100、D1000）是否受影响
+5. 验证fortuneCookie1函数的随机语句是否正常显示
+
+相关函数说明：
+- fortuneCookie1(): 显示骰子投掷时的随机幸运语句
+- diceroll(): 执行骰子投掷的核心逻辑
+- octitem_rotate(): 处理棱镜八面体的颜色变化逻辑
+
+注意事项：
+- 这些修改只是修复了函数调用问题，没有改变游戏逻辑
+- 如果还有其他文件调用这些函数但没有正确包含，可能需要进一步修复
+- 建议检查是否有其他类似的函数依赖问题

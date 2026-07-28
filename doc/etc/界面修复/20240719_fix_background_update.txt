@@ -1,0 +1,74 @@
+# 修复背景图像更新问题
+
+## 问题描述
+在游戏中，当玩家移动到新位置时，背景图像不会自动更新，除非玩家进入战斗或重新加载页面。这是因为移动操作是通过AJAX请求完成的，而背景图像的更新逻辑没有包含在AJAX响应处理中。
+
+## 问题分析
+1. 玩家移动是通过AJAX请求处理的，不会重新加载整个页面
+2. 背景图像是在页面初始加载时设置的，但在AJAX更新时没有更新
+3. 需要在AJAX响应处理中添加更新背景图像的逻辑
+
+## 修复方案
+1. 在game20130526.js中添加了updateBackgroundImage函数，用于更新背景图像
+2. 修改showData函数，在处理AJAX响应时检查位置是否更新，如果更新则调用updateBackgroundImage函数
+3. 修改command.php，将当前位置ID传递给JavaScript
+4. 在game.htm中定义CURSCRIPT变量，确保只在游戏页面更新背景图像
+
+### 具体修改
+1. 在game20130526.js中添加了updateBackgroundImage函数：
+```javascript
+function updateBackgroundImage(locationId) {
+    if (!locationId) return;
+    var bgUrl = "img/location/" + locationId + ".jpg";
+    document.body.style.backgroundImage = "url('" + bgUrl + "')";
+    document.body.style.backgroundPosition = "center";
+}
+```
+
+2. 修改showData函数，在处理AJAX响应时检查位置是否更新：
+```javascript
+// 检查位置是否更新，如果更新则更新背景图片
+if(sDi['pls'] && CURSCRIPT === 'game') {
+    // 从位置文本中提取位置ID
+    var plsText = sDi['pls'];
+    var locationId = null;
+    
+    // 尝试从command.php中获取位置ID
+    if(shwData['locationId']) {
+        locationId = shwData['locationId'];
+    } else {
+        // 如果没有直接提供位置ID，尝试从URL参数中获取
+        var urlParams = new URLSearchParams(window.location.search);
+        var moveto = urlParams.get('moveto');
+        if(moveto) {
+            locationId = moveto;
+        }
+    }
+    
+    // 如果有位置ID，更新背景图片
+    if(locationId) {
+        updateBackgroundImage(locationId);
+    }
+}
+```
+
+3. 修改command.php，将当前位置ID传递给JavaScript：
+```php
+// 传递位置ID给JavaScript，用于更新背景图片
+$gamedata['locationId'] = $pls;
+```
+
+4. 在game.htm中定义CURSCRIPT变量：
+```javascript
+<script type="text/javascript">
+    var CURSCRIPT = 'game';
+</script>
+```
+
+## 修复效果
+1. 玩家移动到新位置时，背景图像会自动更新，无需重新加载页面或进入战斗
+2. 保持了原有的背景图像功能，只是增加了动态更新的能力
+3. 提高了游戏体验，使背景图像变化更加流畅
+
+## 技术说明
+这个修复利用了JavaScript的DOM操作能力，在AJAX响应处理中动态更新背景图像。通过在服务器端传递位置ID，客户端可以准确地知道当前位置，并加载相应的背景图像。这种方法避免了重新加载整个页面，提高了用户体验。

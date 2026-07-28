@@ -261,6 +261,7 @@ namespace revattr
 	function calc_enmity_losshpr(&$pa,&$pd)
 	{
 		$hpr = 1 - ($pa['hp']/$pa['mhp']);
+		if($hpr<0) $hpr = 0;
 		$r = (1 + 2*$hpr) * $hpr;
 		return $r;
 	}
@@ -269,6 +270,7 @@ namespace revattr
 	function calc_garrison_losshpr(&$pa,&$pd)
 	{
 		$hpr = 1 - ($pa['hp']/$pa['mhp']);
+		if($hpr<0) $hpr = 0;
 		$r = -1 * pow($hpr,3) + 4 * $hpr;
 		return $r;
 	}

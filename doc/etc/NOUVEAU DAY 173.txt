@@ -1,0 +1,45 @@
+NOUVEAU DAY 173
+
+变更摘要：
+- 修复使用「■DeathNote■」无反应的问题；同步支持「四面亲手制作的■DeathNote■」。
+- 排查二级菜单类道具（命名、超臆想、毒药等）均已采用$cmd机制，未发现同类问题；本次仅DeathNote存在旧式写法。
+
+问题原因：
+- itemuse()重构后，主调度 include/game/item.main.php 在流程末尾会在 $cmd 为空时强制 $mode='command'（为避免残留状态）。
+- include/game/item.tool.php 中 DeathNote 分支沿用旧逻辑：仅设置 $mode='deathnote' 并 return，未设置 $cmd。
+- 导致 item.main.php 收尾将 $mode 覆盖为 'command'，DeathNote 的二级菜单（deathnote.htm）没有被渲染到 $cmd，界面看起来“没有反应且无错误”。
+
+改动内容：
+1) 文件：include/game/item.tool.php
+   - 将 DeathNote 分支改为使用二级菜单统一机制：
+     • 设置局部 $item = $itmn，用于模板隐藏字段回传道具格位；
+     • include template('deathnote') 后将输出写入 $cmd 并 ob_clean；
+     • 不再设置 $mode，仅 return；
+   - 同步支持物品名「四面亲手制作的■DeathNote■」走同一分支。
+
+   关键差异（节选）：
+   - 旧：
+     $mode = 'deathnote'; $log .= '你翻开了■DeathNote■'; return;
+   - 新：
+     $item = $itmn; include template('deathnote'); $cmd = ob_get_contents(); ob_clean(); return;
+
+2) 文档：本文件记录修复背景、原因与验证建议。
+
+影响范围评估：
+- 仅影响使用 DeathNote 时的界面呈现与提交流程；不更改死亡结算逻辑（仍由 command.php 的 mode='deathnote' 分支调用 include/game/item2.func.php::deathnote() 执行）。
+- 其他已知需要二级菜单的道具有：
+  • 残响兵器（nametag）、超臆想时空（supernametag）、毒药（poison）等，均已采用 $cmd 管理并验证正常。
+
+验证建议（测试机上）：
+1) 正常 DN：获得「■DeathNote■」→ 点击使用 → 应弹出 deathnote.htm 表单 → 正确填写目标信息 → 目标被击杀，产生对应log与news；
+2) 假 DN：获得「四面亲手制作的■DeathNote■」→ 点击使用 → 弹出同样表单 → 提交后自身假死/死亡流程与旧逻辑一致；
+3) 回退检查：使用完毕（提交或放弃）后返回指令界面，未出现卡死或空白；
+4) 回归：再次确认毒药/命名/超臆想二级菜单仍能正常显示与提交。
+
+参考：
+- item.main.php 末尾在 $cmd 为空时才设置 $mode='command' 的策略；
+- command.php 中 mode=='deathnote' 的处理逻辑（模板提交后调用 include/game/item2.func.php::deathnote()）。
+
+结论：
+- DeathNote 二级菜单现已按模块化机制显示与提交；未发现其他同类遗留分支。
+

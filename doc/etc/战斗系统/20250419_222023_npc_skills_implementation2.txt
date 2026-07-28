@@ -1,0 +1,139 @@
+# NPC技能实装：来潮（npc_mecstasy）和勇谍（npc_perfectspy）
+
+## 功能概述
+
+实现了两个专为NPC设计的技能：
+1. **来潮（npc_mecstasy）**：开关技，打开后你对敌人以及敌人对你造成的伤害全部变为真实判定。（也即，直接造成等同于装备武器效果的伤害，不进行其他判定）对持有fireseed3，fireseed4技能以及def高于10000的player该技能无效（并输出额外文案）
+2. **勇谍（npc_perfectspy）**：被动技，你受到的来自陷阱的伤害成为0，且只要你的HP大于200，则在战斗中你的HP不会被下降到200以下。
+
+## 实装内容
+
+1. 在 `gamedata/cache/clubskills_1.php` 文件中添加了 `npc_mecstasy` 和 `npc_perfectspy` 技能的定义
+2. 在 `include/game/itemmain.func.php` 文件中实现了勇谍技能的陷阱伤害免疫效果
+3. 在 `include/game/revattr.func.php` 文件中实现了勇谍技能的战斗HP保护效果
+4. 在 `include/game/revattr.func.php` 文件中实现了来潮技能的真实伤害效果
+
+## 实装细节
+
+### 1. 技能定义
+
+在 `clubskills_1.php` 文件中添加了以下技能定义：
+
+```php
+'npc_mecstasy' => Array
+(
+    'name' => '来潮',
+    'tags' => Array('switch'),
+    'desc' => '开关技，打开后你对敌人以及敌人对你造成的伤害全部变为真实判定。（也即，直接造成等同于装备武器效果的伤害，不进行其他判定）对持有fireseed3，fireseed4技能以及def高于10000的player该技能无效（并输出额外文案）',
+    'svars' => Array(
+        'active' => 0, // 初始不激活
+    ),
+),
+'npc_perfectspy' => Array
+(
+    'name' => '勇谍',
+    'tags' => Array('passive'),
+    'desc' => '被动技，你受到的来自陷阱的伤害成为0，且只要你的HP大于200，则在战斗中你的HP不会被下降到200以下。',
+),
+```
+
+### 2. 勇谍技能实现 - 陷阱伤害免疫
+
+在 `itemmain.func.php` 文件中添加了勇谍技能的陷阱伤害免疫处理逻辑：
+
+```php
+# 「种火IV」效果判定：
+if(!empty($data['clbpara']['skill']) && in_array('fireseed4', $data['clbpara']['skill']))
+{
+    $log .= "<span class='yellow'>「种火IV」使{$name}受到的所有伤害变为0！</span><br>";
+    $damage = 0;
+}
+# 「勇谍」效果判定：
+elseif(!empty($data['clbpara']['skill']) && in_array('npc_perfectspy', $data['clbpara']['skill']))
+{
+    $log .= "<span class='yellow'>「勇谍」技能发动！{$name}对陷阱的敏锐直觉使其免疫了陷阱伤害！</span><br>";
+    $damage = 0;
+}
+else
+{
+    # 计算陷阱伤害
+    $damage = calc_trap_damage($data,NULL,$playerflag,$selflag);
+    # 检查陷阱是否被迎击
+    $damage = check_trap_def_event($data,$damage,$playerflag,$selflag);
+}
+```
+
+这段代码检查玩家是否拥有勇谍技能，如果有，则将陷阱伤害设为0，并显示相应的提示信息。
+
+### 3. 勇谍技能实现 - 战斗HP保护
+
+在 `revattr.func.php` 文件的 `get_final_dmg_fix` 函数中添加了勇谍技能的HP保护处理逻辑：
+
+```php
+# 「勇谍」效果判定：
+if(!empty($pd['clbpara']['skill']) && in_array('npc_perfectspy', $pd['clbpara']['skill']) && $pd['hp'] > 200 && ($pd['hp'] - $fin_dmg) < 200)
+{
+    $fin_dmg = $pd['hp'] - 200;
+    $log .= "<span class='yellow'>「勇谍」技能发动！{$pd['nm']}的生命值不会低于200！</span><br>";
+    return $fin_dmg;
+}
+```
+
+这段代码检查防守方是否拥有勇谍技能，且当前HP大于200，且受到的伤害会导致HP低于200，如果满足这些条件，则将伤害调整为只减少到200点HP，并显示相应的提示信息。
+
+### 4. 来潮技能实现 - 真实伤害
+
+在 `revattr.func.php` 文件的 `get_fix_damage` 函数中添加了来潮技能的真实伤害处理逻辑：
+
+```php
+# 「来潮」效果判定：
+if((!empty($pa['clbpara']['skill']) && in_array('npc_mecstasy', $pa['clbpara']['skill']) && !empty($pa['clbpara']['skillpara']['npc_mecstasy']['active'])) || 
+   (!empty($pd['clbpara']['skill']) && in_array('npc_mecstasy', $pd['clbpara']['skill']) && !empty($pd['clbpara']['skillpara']['npc_mecstasy']['active'])))
+{
+    # 检查是否对种火玩家无效
+    if((!empty($pd['clbpara']['skill']) && (in_array('fireseed3', $pd['clbpara']['skill']) || in_array('fireseed4', $pd['clbpara']['skill']))) || $pd['def'] > 10000)
+    {
+        $log .= "<span class='red'>「来潮」技能发动！但{$pd['nm']}的特殊能力使其免疫了真实伤害！</span><br>";
+        return 0;
+    }
+    
+    $damage = $pa['wepe'];
+    $log .= "<span class='red'>「来潮」技能发动！{$pa['nm']}的武器直接造成了等同于其效果值的真实伤害！</span><br>";
+    return $damage;
+}
+```
+
+这段代码检查攻击方或防守方是否拥有来潮技能且处于激活状态，如果有，则检查防守方是否拥有种火III/IV技能或防御力高于10000，如果满足这些条件，则技能无效；否则，直接造成等同于武器效果值的真实伤害，跳过所有其他伤害计算。
+
+## 使用方法
+
+### 为NPC添加勇谍技能
+
+```php
+$npc['clbpara']['skill'][] = 'npc_perfectspy';
+```
+
+### 为NPC添加来潮技能
+
+```php
+// 添加技能
+$npc['clbpara']['skill'][] = 'npc_mecstasy';
+
+// 初始化技能参数（如果不存在）
+if(!isset($npc['clbpara']['skillpara']['npc_mecstasy'])) {
+    $npc['clbpara']['skillpara']['npc_mecstasy'] = array(
+        'active' => 0  // 初始不激活
+    );
+}
+
+// 激活技能
+$npc['clbpara']['skillpara']['npc_mecstasy']['active'] = 1;
+```
+
+## 注意事项
+
+1. 这两个技能专为NPC设计，玩家不应该获得这些技能
+2. 来潮技能是开关技，需要先激活才能生效
+3. 来潮技能对拥有种火III/IV技能的玩家或防御力高于10000的玩家无效
+4. 勇谍技能的HP保护只在HP大于200时生效，如果HP已经低于或等于200，则不会提供保护
+5. 勇谍技能的陷阱伤害免疫效果对所有类型的陷阱都有效

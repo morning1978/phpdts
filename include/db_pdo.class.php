@@ -105,7 +105,10 @@ class dbstuff {
 			if(!$data) return;
 			foreach ($data as $key => $value) {
 				$fieldlist .= "{$key},";
-				$valuelist .= "'{$value}',";
+				// 对数据进行转义处理，防止SQL注入和JSON数据损坏
+				$escaped_value = $this->con->quote($value);
+				// quote方法会自动添加引号，所以这里不需要再添加
+				$valuelist .= "{$escaped_value},";
 			}
 			if(!empty($fieldlist) && !empty($valuelist)){
 				$query .= '(' . substr($fieldlist, 0, -1) . ') VALUES (' . substr($valuelist, 0, -1) .')';
@@ -118,7 +121,10 @@ class dbstuff {
 				if(!$dv) continue;
 				$valuelist .= "(";
 				foreach ($dv as $value) {
-					$valuelist .= "'{$value}',";
+					// 对数据进行转义处理，防止SQL注入和JSON数据损坏
+					$escaped_value = $this->con->quote($value);
+					// quote方法会自动添加引号，所以这里不需要再添加
+					$valuelist .= "{$escaped_value},";
 				}
 				$valuelist = substr($valuelist, 0, -1).'),';
 			}
@@ -162,8 +168,12 @@ class dbstuff {
 	function array_update($dbname, $data, $where, $o_data=NULL){ //根据$data的键和键值更新数据
 		$query = '';
 		foreach ($data as $key => $value) {
-			if(!is_array($o_data) || !isset($o_data[$key]) || $value !== $o_data[$key])
-				$query .= "{$key} = '{$value}',";
+			if(!is_array($o_data) || !isset($o_data[$key]) || $value !== $o_data[$key]) {
+				// 对数据进行转义处理，防止SQL注入和JSON数据损坏
+				$escaped_value = $this->con->quote($value);
+				// quote方法会自动添加引号，所以这里不需要再添加
+				$query .= "{$key} = {$escaped_value},";
+			}
 		}
 		if(!empty($query)){
 			$query = "UPDATE {$dbname} SET ".substr($query, 0, -1) . " WHERE {$where}";
@@ -176,16 +186,18 @@ class dbstuff {
 		$fields = $range = Array();
 		foreach($data as $rval){
 			$con = $rval[$confield];
-			$range[] = "'$con'";
+			$escaped_con = $this->con->quote($con);
+			$range[] = $escaped_con;
 			foreach($rval as $fkey => $fval){
 				if($fkey != $confield){
+					$escaped_fval = $this->con->quote($fval);
 					if(isset(${$fkey.'qry'})){
-						${$fkey.'qry'} .= "WHEN '$con' THEN '$fval' ";
+						${$fkey.'qry'} .= "WHEN $escaped_con THEN $escaped_fval ";
 					}else{
 						$fields[] = $fkey;
-						${$fkey.'qry'} = "(CASE $confield WHEN '$con' THEN '$fval' ";
+						${$fkey.'qry'} = "(CASE $confield WHEN $escaped_con THEN $escaped_fval ";
 					}
-				}				
+				}
 			}
 		}
 		$query = '';

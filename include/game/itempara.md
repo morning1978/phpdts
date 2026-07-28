@@ -28,7 +28,7 @@ XX => ``mhp``, ``msp``, ``mss``, ``att``, ``def``, ``wp/k/g/c/d/f``, ``money``, 
 
 The following keys will apply:
 
-> ``PlatformPlayerMode`` - ``0`` - Uses the values builtin ``$itmpara``, ``1`` - Unused for now. ``2`` - Grab values from player table by matching ``PlatformPlayerName`` and populate them.
+> ``PlatformPlayerMode`` - ``0`` - Uses the values builtin ``$itmpara``, ``1`` - Unused for now. ``2`` - Grab values from player table by matching ``PlatformPlayerName`` and populate them. In case this value is ``2``, use ``PlatformPlayerPID`` instead of ``PlatformPlayerName``, obviously.
 >
 > ``PlatformPlayerName`` - players.sql -> ``name``.
 >

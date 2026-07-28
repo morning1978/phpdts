@@ -1,0 +1,67 @@
+# 事件机制基础逻辑实现
+
+日期：2024-07-12
+
+## 实现内容
+
+1. 创建了新文件 `include/game/revevent.func.php`，实现了以下功能：
+
+   - `update_charge_values(&$data)`: 更新玩家的charge值
+     - charge1: 最高到101，提升速度按照randver1而定，最高4点每次
+     - charge2: 不设上限，提升速度按照randver2而定，最高100点每次
+     - charge3: 最高值128，最低值-128，可提升或削减
+     - charge4: 没有上限或下限，可提升或削减
+
+   - `get_charge_value($data, $charge_key = '')`: 获取玩家的charge值
+     - 可以获取单个charge值或所有charge值
+
+   - `set_charge_value(&$data, $charge_key, $value)`: 修改玩家的charge值
+     - 根据不同的charge_key应用不同的限制
+
+   - `process_charge_events(&$data)`: 在玩家移动或探索时调用此函数来更新charge值
+
+2. 修改了 `include/game/search.func.php` 文件：
+
+   - 在文件头部引入了 `revevent.func.php`
+   - 在 `move` 和 `search` 函数中调用 `process_charge_events` 函数，更新玩家的charge值
+
+## 实现逻辑
+
+1. charge1 的更新逻辑：
+   - 最高值为101
+   - 提升速度基于randver1，计算公式为 min(4, max(1, ceil(randver1/32)))
+   - randver1范围为1-128，所以提升速度为1-4点
+
+2. charge2 的更新逻辑：
+   - 没有上限
+   - 提升速度基于randver2，计算公式为 min(100, max(1, ceil(randver2/3)))
+   - randver2范围为1-256，所以提升速度为1-100点
+
+3. charge3 的更新逻辑：
+   - 范围为-128到128
+   - 随机提升或削减1-3点
+
+4. charge4 的更新逻辑：
+   - 没有上下限
+   - 随机提升或削减1-10点
+
+## 使用方法
+
+1. 获取charge值：
+   ```php
+   $charge1 = get_charge_value($player_data, 'charge1');
+   // 或获取所有charge值
+   $all_charges = get_charge_value($player_data);
+   ```
+
+2. 设置charge值：
+   ```php
+   set_charge_value($player_data, 'charge1', 50);
+   ```
+
+3. 更新所有charge值：
+   ```php
+   update_charge_values($player_data);
+   ```
+
+这些函数已经集成到玩家移动和探索的流程中，每次玩家移动或探索时都会自动更新charge值。

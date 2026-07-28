@@ -1,0 +1,49 @@
+时间戳: 2024-12-15 15:00:00 (NOUVEAU DAY -114)
+操作: 修复RuleSet配置变量作用域问题
+
+问题诊断:
+根据用户提供的调试文件分析，发现了变量作用域问题：
+
+1. 刷新主页时（02-42-31）：
+   - can_create_ruleset_room函数能正确访问全局变量
+   - ruleset_enabled = 1, config_exists = yes
+   - 权限检查正常通过
+
+2. 创建房间时（02-42-34）：
+   - roommng.func.php中能正确访问变量（ruleset_enabled = 1）
+   - 但can_create_ruleset_room函数内部访问失败：
+     * ruleset_enabled = undefined
+     * ruleset_config_exists = no
+   - 导致权限检查失败
+
+根本原因:
+在roommng_create_new_room函数内部使用include_once时，被包含文件中的全局变量在函数作用域中可能无法正确访问。这是PHP的变量作用域机制导致的问题。
+
+解决方案:
+1. 创建ensure_ruleset_config_loaded()函数，直接在$GLOBALS中设置配置
+2. 在can_create_ruleset_room函数开始时调用此函数确保配置加载
+3. 将配置数据硬编码到函数中，避免依赖include的作用域
+
+修改内容:
+1. gamedata/ruleset/ruleset_config.php:
+   - 添加ensure_ruleset_config_loaded()函数
+   - 在函数中直接设置$GLOBALS['ruleset_enabled']和$GLOBALS['ruleset_config']
+   - 修改can_create_ruleset_room()函数，在开始时调用ensure_ruleset_config_loaded()
+   - 修改get_ruleset_config()函数，确保配置已加载
+
+2. include/roommng.func.php:
+   - 在权限检查前调用ensure_ruleset_config_loaded()
+
+技术细节:
+- 使用$GLOBALS直接设置全局变量，避免作用域问题
+- 将完整的RuleSet配置硬编码到ensure_ruleset_config_loaded()函数中
+- 确保无论在什么作用域中调用，配置都能正确加载
+
+预期效果:
+修复后，无论是在主页刷新还是创建房间时，can_create_ruleset_room函数都应该能正确访问配置变量，权限检查应该正常工作。
+
+测试建议:
+1. 清除之前的调试文件
+2. 尝试创建ACBRA_2009房间
+3. 检查新生成的调试文件，确认配置变量能正确访问
+4. 验证房间创建是否成功

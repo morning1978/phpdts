@@ -1,0 +1,42 @@
+2024年7月19日 $itmpara 字段 tooltip 显示实现记录
+
+在2024年7月19日，游戏中的物品添加了新的字段$itmpara，该字段为一数组，可让物品有着数组中定义的键值的属性。
+现在，我们实现了 $itmpara 字段在 tooltip 中的显示功能，使玩家可以直观地了解物品的特殊属性。
+
+以下是对应此功能的实现记录：
+
+1. 创建 itmpara 的 tooltip 配置文件
+   - 创建了 gamedata\cache\itmpara_tooltip.php 文件，定义了 $itmpara 字段中各个键值对应的 tooltip 显示内容
+   - 配置文件使用数组格式，每个键值对应一个数组，包含标题、格式、后缀、颜色和条件函数
+   - 条件函数用于判断是否显示该键值，例如只在武器上显示伤害增加属性
+
+2. 创建处理 itmpara tooltip 的函数
+   - 创建了 include\game\itmpara_tooltip.func.php 文件，定义了 parse_itmpara_tooltip 和 add_itmpara_tooltip_to_item 函数
+   - parse_itmpara_tooltip 函数用于解析 itmpara 字段，生成 tooltip 内容
+   - add_itmpara_tooltip_to_item 函数用于将 itmpara tooltip 添加到物品名称上
+
+3. 修改 parse_nameinfo_desc 函数
+   - 修改了 include\global.func.php 文件中的 parse_nameinfo_desc 函数，使其支持 itmpara tooltip
+   - 添加了 itmpara 和 itmk 参数，用于传递 itmpara 字段和物品类型
+   - 在函数中引入 itmpara_tooltip.func.php 和 itmpara_tooltip.php 文件，解析 itmpara 字段
+
+4. 修改调用 parse_nameinfo_desc 函数的地方
+   - 修改了 include\game.func.php 文件中的 init_profile 函数
+   - 修改了 include\game\battle.func.php 文件中的 findcorpse 函数
+   - 修改了 include\game\itemplace.func.php 文件中的 get_npc_helpinfo 函数
+   - 修改了 include\vnworld\vnmix.func.php 文件中的 parse_queue_vnmix_info 函数
+   - 确保在调用 parse_nameinfo_desc 函数时传递 itmpara 参数
+
+5. 实现的功能
+   - 根据 itmpara 中的键值，显示反应其用途的对应文本
+   - 例如：{"AddDamageRaw":100,"AddDamagePercentage":10} 会显示为：
+     最终伤害增加：100
+     最终伤害增加：10%
+   - 如果一个物品的 itmpara 中有 lore 值，则直接输出该键值中的字符串到 tooltip
+
+6. 配置文件的扩展性
+   - 由于 itmpara 键值必然会在之后不断增多，配置文件设计为易于扩展
+   - 可以通过简单地添加新的键值配置，来支持新的 itmpara 键值
+   - 配置文件中详细注释了每个配置项的作用和格式
+
+这些修改确保了当物品具有 itmpara 字段时，其特殊属性会在 tooltip 中显示，使玩家可以直观地了解物品的特殊属性。

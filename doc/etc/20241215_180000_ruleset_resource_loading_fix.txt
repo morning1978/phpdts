@@ -1,0 +1,219 @@
+时间戳: 2024-12-15 18:00:00 (NOUVEAU DAY -114)
+操作: 修复RuleSet资源文件加载问题
+
+问题描述:
+用户报告两个主要问题：
+1. ACBRA_2009的NPC表数据仍有空值，游戏初始化时出现array_merge()警告
+2. 无论哪个RuleSet，都没有正常适用其resources_1中的内容，如$plsinfo、$xyinfo、$areainfo、$clubinfo等，玩家头像也没有按照ruleset/img/中的对应头像载入
+
+根本原因分析:
+
+1. array_merge()警告问题：
+   - 在system.func.php第105行，当$npc['sub'][$sub]为null时，array_merge()会产生警告
+   - 虽然已经检查了$npc['sub']是否存在，但没有检查具体的子元素是否为null
+
+2. RuleSet资源文件未加载问题：
+   - 在include/common.inc.php中，resources文件在第62行被加载
+   - 但$groomid变量在第126行才被设置
+   - 导致config()函数无法识别当前房间的RuleSet，始终加载默认资源文件
+
+修复方案:
+
+1. 修复array_merge()警告 (include/system.func.php):
+   原始代码：
+   ```php
+   if(isset($npc['sub']) && is_array($npc['sub']) && !empty($npc['sub'])) {
+       $subnum = sizeof($npc['sub']);
+       $sub = $j % $subnum;
+       $npc = array_merge($npc,$npc['sub'][$sub]);
+   }
+   ```
+   
+   修复后代码：
+   ```php
+   if(isset($npc['sub']) && is_array($npc['sub']) && !empty($npc['sub'])) {
+       $subnum = sizeof($npc['sub']);
+       $sub = $j % $subnum;
+       // 确保sub数组中的元素存在且为数组
+       if(isset($npc['sub'][$sub]) && is_array($npc['sub'][$sub])) {
+           $npc = array_merge($npc,$npc['sub'][$sub]);
+       } else {
+           error_log("Warning: NPC type {$i} sub[{$sub}] is null or not array. Using base NPC data.");
+       }
+   }
+   ```
+
+2. 修复RuleSet资源文件加载顺序 (include/common.inc.php):
+   - 将resources等配置文件的加载从第62行移动到$groomid设置之后（第143行）
+   - 确保config()函数能够正确识别当前房间的RuleSet
+   - 保持其他代码逻辑不变
+
+修复后的加载顺序：
+1. 加载基础函数库
+2. 设置$gtablepre和基础变量
+3. 获取用户数据和房间信息
+4. 设置$groomid变量
+5. 加载配置文件（此时config()函数可以正确识别RuleSet）
+
+技术细节:
+
+1. config()函数工作机制：
+   - 检查$groomid是否存在
+   - 查询数据库获取房间的gruleset字段
+   - 优先加载gamedata/ruleset/{id}/cache/文件
+   - 如果RuleSet文件不存在，fallback到默认文件
+
+2. RuleSet资源文件结构：
+   - gamedata/ruleset/ACBRA_2009/cache/resources_1.php
+   - gamedata/ruleset/ACDTS_2011/cache/resources_1.php  
+   - gamedata/ruleset/ACDTS_298SP4/cache/resources_1.php
+
+3. 头像加载机制：
+   - init.func.php中的get_ruleset_avatar_path()函数
+   - 优先使用RuleSet专用头像
+   - 如果RuleSet头像不存在，fallback到默认头像
+
+预期效果:
+1. 消除ACBRA_2009初始化时的array_merge()警告
+2. RuleSet房间正确加载对应的$plsinfo、$xyinfo、$areainfo、$clubinfo等资源
+3. 玩家头像按照ruleset/img/中的对应头像正确显示
+4. 不影响默认房间的正常运行
+
+测试建议:
+1. 创建ACBRA_2009房间，检查是否还有array_merge()警告
+2. 在RuleSet房间中检查地图名称是否显示为RuleSet专用名称
+3. 检查玩家头像是否使用RuleSet专用头像
+4. 验证默认房间功能是否正常
+
+注意事项:
+- 此修复不会影响现有游戏数据
+- 配置文件加载顺序的调整是安全的
+- 保持了向后兼容性
+
+=== 头像路径修复 (第二阶段) ===
+
+问题描述:
+用户报告头像方面仍有问题：
+1. 用户头像仍从默认头像中选择
+2. NPC头像地址错误：http://192.168.2.23:23333/img/img/n_12.gif
+3. 正确地址应为：http://192.168.2.23:23333/gamedata/ruleset/ACBRA_2009/img/n_12.gif
+
+根本原因:
+1. get_ruleset_avatar_path()函数依赖全局变量$ruleset_config，但该变量未正确初始化
+2. JavaScript中userIconMover()函数使用selectedIndex而不是value
+3. 模板文件中头像路径硬编码为img/路径，未考虑RuleSet
+4. NPC头像显示逻辑未集成RuleSet支持
+
+修复方案:
+
+1. 修复get_ruleset_avatar_path()函数 (gamedata/ruleset/ruleset_config.php):
+   - 改为直接调用get_ruleset_config()而不依赖全局变量
+   - 修复相关辅助函数的依赖问题
+
+2. 修复JavaScript头像预览 (include/game.js):
+   - 将selectedIndex改为value以获取正确的头像ID
+   - 保持RuleSet头像路径支持
+
+3. 修复模板文件中的头像路径:
+   - templates/default/npcinfohelp.htm: 添加RuleSet NPC头像支持
+   - templates/default/usergdicon.htm: 添加RuleSet用户头像支持
+   - templates/nouveau/usergdicon.htm: 添加RuleSet用户头像支持和JavaScript修复
+   - templates/default/user_profile.htm: 添加RuleSet用户头像支持
+   - templates/nouveau/profile.htm: 添加RuleSet用户头像支持
+
+4. 头像路径生成逻辑:
+   - 检查当前房间是否使用RuleSet
+   - 优先使用RuleSet头像路径
+   - 如果RuleSet头像不存在，fallback到默认路径
+   - 支持NPC和用户头像的自动切换
+
+技术实现细节:
+
+1. NPC头像路径生成:
+   ```php
+   // 从n_12.gif提取NPC类型ID
+   $npc_type = intval(str_replace(array('n_', '.gif'), '', $icon_filename));
+   $ruleset_path = get_ruleset_avatar_path($ruleset_id, 'npc', $npc_type);
+   ```
+
+2. 用户头像路径生成:
+   ```php
+   $avatar_type = $gender == 'f' ? 'female' : 'male';
+   $ruleset_path = get_ruleset_avatar_path($ruleset_id, $avatar_type, $icon_id);
+   ```
+
+3. JavaScript头像预览:
+   ```javascript
+   if (typeof window.rulesetAvatarPath !== 'undefined' && window.rulesetAvatarPath) {
+       newSrc = `${window.rulesetAvatarPath}${gender}_${iconValue}.gif`;
+   } else {
+       newSrc = `img/${gender}_${iconValue}.gif`;
+   }
+   ```
+
+预期效果:
+1. NPC头像正确显示RuleSet专用头像
+2. 用户头像选择界面显示RuleSet专用头像
+3. 头像预览功能正确工作
+4. 所有模板都支持RuleSet头像
+5. 保持向后兼容性
+
+=== 核心问题修复 (第三阶段) ===
+
+问题根源发现:
+经过深入分析，发现了真正的问题所在：
+
+1. **NPC头像ID错误**：
+   - include/init.func.php第50行使用$pa['type']（NPC类型）而不是$pa['icon']（头像ID）
+   - 导致NPC头像路径生成错误
+
+2. **配置函数问题**：
+   - get_ruleset_config()函数内部有重复的配置定义
+   - 第二个配置定义缺少avatar_config，导致头像配置丢失
+
+3. **template/default文件无关**：
+   - 确认template/default文件与RuleSet功能无关，无需修改
+
+核心修复:
+
+1. **修复NPC头像ID使用** (include/init.func.php):
+   ```php
+   // 修复前：
+   $ruleset_avatar = get_ruleset_avatar_path($ruleset_id, 'npc', $pa['type']);
+
+   // 修复后：
+   $ruleset_avatar = get_ruleset_avatar_path($ruleset_id, 'npc', $pa['icon']);
+   ```
+
+2. **修复配置函数** (gamedata/ruleset/ruleset_config.php):
+   - 统一使用全局$ruleset_config变量
+   - 确保所有函数都能访问完整的avatar_config配置
+
+3. **修复测试脚本路径** (doc/etc/test_avatar_paths.php):
+   - 修正GAME_ROOT路径定义，适配测试环境
+
+技术细节:
+
+1. **NPC数据结构**：
+   - NPC配置中'icon'字段存储头像ID（如：'icon' => 12）
+   - NPC配置中'type'字段存储NPC类型（如：type => 12）
+   - 头像路径应该基于'icon'字段而不是'type'字段
+
+2. **RuleSet头像映射**：
+   - ACBRA_2009: 12 => 'n_12.gif'
+   - ACDTS_2011: 12 => 'n_12.gif'
+   - ACDTS_298SP4: 12 => 'n_12.gif'
+
+3. **路径生成逻辑**：
+   ```php
+   // 正确的路径生成
+   $base_path = './gamedata/ruleset/ACBRA_2009/img/';
+   $npc_file = $avatar_config['npc_avatars'][$pa['icon']]; // 'n_12.gif'
+   $full_path = $base_path . $npc_file; // './gamedata/ruleset/ACBRA_2009/img/n_12.gif'
+   ```
+
+最终效果:
+- NPC头像路径从错误的 img/img/n_12.gif 修正为正确的 gamedata/ruleset/ACBRA_2009/img/n_12.gif
+- 用户头像选择正确使用RuleSet专用头像
+- 保持完全的向后兼容性
+- 只修改核心逻辑，不影响template/default文件

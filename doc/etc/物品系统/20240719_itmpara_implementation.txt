@@ -1,0 +1,24 @@
+2024年7月19日 $itmpara 字段实现记录
+
+在2024年7月19日，游戏中的物品添加了新的字段$itmpara，该字段为一数组，可让物品有着数组中定义的键值的属性。
+以下是对应此字段的实现记录：
+
+1. 地图物品（mapitem_1.php）
+   - 修改了system.func.php文件中的地图物品生成代码，添加了对$itmpara字段的支持
+   - 更新了SQL查询，将$itmpara字段添加到地图物品的插入语句中
+   - 允许在mapitem_1.php文件中为每个物品定义$itmpara字段
+
+2. 商店物品（shopitem_1.php）
+   - 修改了system.func.php文件中的商店物品生成代码，添加了对$itmpara字段的支持
+   - 更新了SQL查询，将$itmpara字段添加到商店物品的插入语句中
+   - 允许在shopitem_1.php文件中为每个物品定义$itmpara字段
+
+3. 合成物品（mixitem_1.php）
+   - 修改了itemmix.func.php文件中的$itmpara0变量处理，确保正确处理$itmpara字段
+   - 更新了mixitem_1.php文件中的物品定义，为每个物品添加了$itmpara字段
+   - 由于mixitem_1.php文件较大，只更新了部分物品，其余物品将在后续更新中完成
+
+注意事项：
+- 所有新添加的物品都应该包含$itmpara字段，即使该字段为空
+- $itmpara字段应该是一个JSON字符串，表示一个键值对数组
+- 可以使用get_itmpara()、get_single_itmpara()、set_itmpara()和del_single_itmpara()函数来操作$itmpara字段

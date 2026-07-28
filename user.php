@@ -3,6 +3,7 @@
 define('CURSCRIPT', 'user');
 
 require './include/common.inc.php';
+require './include/masterslave.func.php';
 //require './include/user.func.php';
 
 
@@ -15,7 +16,47 @@ if(!isset($mode)){
 	$mode = 'show';
 }
 
-if($mode == 'edit') {
+if($mode == 'sync_master') {
+	// 处理主从数据同步
+	$gamedata=Array();$gamedata['innerHTML']['info'] = '';
+
+	if($slave_level >= 1 && !empty($master_server_name)) {
+		if(!empty($master_username) && !empty($master_password)) {
+			$sync_result = sync_user_from_master($master_username, md5($master_password), $cuser);
+			$gamedata['innerHTML']['info'] .= $sync_result['message'] . '<br>';
+		} else {
+			$gamedata['innerHTML']['info'] .= '请输入主服务器的用户名和密码<br>';
+		}
+	} else {
+		$gamedata['innerHTML']['info'] .= '当前服务器不是从服务器或未配置主服务器信息<br>';
+	}
+
+	ob_clean();
+	$jgamedata = compatible_json_encode($gamedata);
+	echo $jgamedata;
+	ob_end_flush();
+
+} elseif($mode == 'reverse_migrate') {
+	// 处理反向迁移
+	$gamedata=Array();$gamedata['innerHTML']['info'] = '';
+
+	if(is_reverse_migration_mode() && !empty($master_server_name)) {
+		if(!empty($remote_username) && !empty($remote_password)) {
+			$migrate_result = reverse_migrate_user($cuser, $remote_username, md5($remote_password));
+			$gamedata['innerHTML']['info'] .= $migrate_result['message'] . '<br>';
+		} else {
+			$gamedata['innerHTML']['info'] .= '请输入远端从服务器的用户名和密码<br>';
+		}
+	} else {
+		$gamedata['innerHTML']['info'] .= '当前服务器不是反向迁移模式或未配置目标服务器信息<br>';
+	}
+
+	ob_clean();
+	$jgamedata = compatible_json_encode($gamedata);
+	echo $jgamedata;
+	ob_end_flush();
+
+} elseif($mode == 'edit') {
 	$gamedata=Array();$gamedata['innerHTML']['info'] = '';
 	if($opass && $npass && $rnpass){
 		$pass_right = true;
@@ -77,12 +118,25 @@ if($mode == 'edit') {
 	# 切换用户界面
 	if(!empty($templateid))
 	{
-		if($templateid != 1) $templateid = 1;
-		# 暂时只允许管理员账户切换至新界面
-		if($udata['groupid'] < 9)
-		{
+		// 支持的模板ID: 0=默认, 1=LULUXIA(未开放), 2=NOUVEAU
+		if($templateid == 1) {
+			# LULUXIA模板暂时只允许管理员账户切换
+			if($udata['groupid'] < 9)
+			{
+				$templateid = 0;
+				$gamedata['innerHTML']['info'] .= '界面切换失败，LULUXIA界面暂未实装。<br>';
+			}
+		} elseif($templateid == 2) {
+			# NOUVEAU模板对所有用户开放
+			//$gamedata['innerHTML']['info'] .= '已切换到NOUVEAU界面，刷新页面生效。<br>';
+			if($udata['groupid'] < 9)
+			{
+				$templateid = 0;
+				$gamedata['innerHTML']['info'] .= 'NOUVEAU界面尚在施工中。<br>';
+			}
+		} else {
+			# 其他值默认为经典界面
 			$templateid = 0;
-			$gamedata['innerHTML']['info'] .= '界面切换失败，新版界面暂未实装。<br>';
 		}
 	}
 	$db->query("UPDATE {$gtablepre}users SET gender='$gender', icon='$icon',{$passqry}motto='$motto',  killmsg='$killmsg', lastword='$lastword', credits='$credits', credits2='$credits2' ,nick='$nick', u_templateid='$templateid' WHERE username='$cuser'");
@@ -107,6 +161,23 @@ if($mode == 'edit') {
 	$select_icon = $icon;
 	//这里假定player表里有usertitle字段而且储存方式是这样蛋疼的。具体程序虚子你写。
 	$utlist = get_utitlelist();//然后去接收用户传来的$
+
+	// 主从同步相关变量
+	$show_sync_button = ($slave_level >= 1 && !empty($master_server_name));
+	$user_sync_status = get_user_sync_status($cuser);
+	if($user_sync_status) {
+		$user_sync_status['sync_time_formatted'] = date('Y-m-d H:i:s', $user_sync_status['sync_time']);
+	}
+	$sync_button_text = $user_sync_status ? "从{$master_server_name}同步已绑定的账号数据" : "从{$master_server_name}迁移用户和成就数据";
+
+	// 反向迁移相关变量
+	$show_reverse_migrate_button = (is_reverse_migration_mode() && !empty($master_server_name));
+	$user_reverse_migrate_status = get_reverse_migration_status($cuser);
+	if($user_reverse_migrate_status) {
+		$user_reverse_migrate_status['sync_time_formatted'] = date('Y-m-d H:i:s', $user_reverse_migrate_status['sync_time']);
+	}
+	$reverse_migrate_button_text = $user_reverse_migrate_status ? "重新推送到{$master_server_name}" : "推送到{$master_server_name}";
+
 	include template('user');
 }
 

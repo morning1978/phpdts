@@ -52,7 +52,10 @@ $chatinnews = 50;
 /*template settings*/
 //模板编号。默认为1
 define('STYLEID', '1');
-define('TEMPLATEID', '1');
+
+// 模板设置将在用户数据加载后进行
+// 这里先设置默认值，稍后会在common.inc.php中重新设置
+define('TEMPLATEID', 1);
 define('TPLDIR', './templates/default');
 
 ?>

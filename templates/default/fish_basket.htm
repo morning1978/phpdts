@@ -1,0 +1,26 @@
+<form method="post" name="gamecmd" onsubmit="return false;">
+<input type="hidden" id="mode" name="mode" value="command">
+<input type="hidden" id="command" name="command" value="choose_fish">
+<div class="subtitle">鱼篓子</div>
+<div class="fish-basket-content">
+你打开了鱼篓子，里面有以下物品：<br>
+<!--{loop $clbpara['fish_basket']['items'] $index $item}-->
+<input type='radio' name='choose' value='{$index}'>
+<span class='yellow'>{$item['itm']}</span>
+<!--{if !empty($item['itmsk'])}-->
+（
+<!--{loop $item['itmsk'] $attr}-->
+<!--{if isset($itemspkinfo[$attr])}-->
+{$itemspkinfo[$attr]}、
+<!--{/if}-->
+<!--{/loop}-->
+）
+<!--{/if}-->
+ - {$iteminfo[$item['itmk']]} {$item['itme']}<br>
+<!--{/loop}-->
+<br>
+请选择一个物品取出：<br>
+<input type="button" class="cmdbutton" value="取出选中物品" onclick="if(document.querySelector('input[name=choose]:checked')) { postCmd('gamecmd','command.php');this.disabled=true; } else { alert('请选择一个物品！'); }">
+<input type="button" class="cmdbutton" value="返回" onclick="$('command').value='';$('mode').value='command';postCmd('gamecmd','command.php');this.disabled=true;">
+</div>
+</form>

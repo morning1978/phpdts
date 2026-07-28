@@ -1,0 +1,78 @@
+NOUVEAU DAY 68 - 数据库结构自动更新功能修复
+
+时间: 2025-06-15
+问题: 页底出现 "Notice (8): Undefined variable: need_update_db_structrue in /home2/a23336ht/public_html/dts1/include/common.inc.php on line 67" 错误，系统自动更新数据表功能失效
+
+问题分析:
+1. 变量 $need_update_db_structrue 在第67行被使用，但此时配置文件还未加载
+2. 该变量在 gamedata/cache/gamecfg_1.php 中定义（第181行），但要到第136行才会被加载
+3. 由于变量未定义，条件判断失败，导致 roommng_verify_db_game_structure() 函数不会被调用
+4. 这导致数据库结构自动更新功能完全失效
+
+修复方案:
+1. 移除第67行的过早检查
+2. 在配置文件加载后（第151-155行）添加正确的检查逻辑
+3. 使用 isset() 检查确保变量存在后再进行判断
+
+修改内容:
+文件: include/common.inc.php
+
+1. 删除第67行的过早检查:
+   - 移除: if($need_update_db_structrue) roommng_verify_db_game_structure();
+
+2. 在第151-155行添加正确的检查:
+   ```php
+   // 检查数据库结构更新（在配置文件加载后执行）
+   if(isset($need_update_db_structrue) && $need_update_db_structrue) {
+       roommng_verify_db_game_structure();
+   }
+   ```
+
+技术细节:
+- $need_update_db_structrue 变量控制是否在版本更新时检查增补数据库字段
+- roommng_verify_db_game_structure() 函数负责检查并添加缺失的数据库字段
+- 该功能对于房间系统和RuleSet系统的正常运行至关重要
+- 修复后，系统将在每次页面加载时正确检查数据库结构
+
+预期效果:
+1. 消除 "Undefined variable" 错误提示
+2. 恢复数据库结构自动更新功能
+3. 确保新增的数据库字段能够正确创建
+4. 提高系统稳定性和兼容性
+
+修复时间: 2025-06-15
+
+### 第二个问题：slave_level 变量未定义错误
+
+问题描述:
+页底出现 "Notice (8): Undefined variable: slave_level in /home2/a23336ht/public_html/dts1/include/common.inc.php on line 43" 错误
+
+问题分析:
+1. $slave_level 变量在 config.inc.php 第102行已正确定义（值为0）
+2. config.inc.php 在 common.inc.php 第24行被加载
+3. $slave_level 在第43行被使用，此时配置文件已加载
+4. 问题在于没有使用 isset() 检查，在某些特殊情况下可能导致变量访问错误
+
+修复方案:
+在使用 $slave_level 变量时添加 isset() 检查，确保变量存在后再进行判断
+
+修改内容:
+文件: include/common.inc.php 第43行
+
+修改前:
+```php
+if($slave_level == 3 && !empty($master_dbhost) && !empty($master_dbuser) && !empty($master_dbname)) {
+```
+
+修改后:
+```php
+if(isset($slave_level) && $slave_level == 3 && !empty($master_dbhost) && !empty($master_dbuser) && !empty($master_dbname)) {
+```
+
+技术细节:
+- 添加 isset($slave_level) 检查确保变量存在
+- 保持原有的逻辑判断不变
+- 提高代码的健壮性和容错性
+- 消除 PHP Notice 错误提示
+
+修复时间: 2025-06-15

@@ -50,13 +50,13 @@
 <br>
 
 	<!-- 第 -1 行：社团提示相关-->
-	<!--{if $club==19}--> 
+	<!--{if $club==19}-->
 		【<span class="lime">报应点数：<span id="anum">$rp</span></span>】<br>
 	<!--{/if}-->
-	<!--{if $nick==69}--> 
+	<!--{if $nick==69}-->
 		【<span class="lime">梦之数值：<span id="anum">$clbpara['randver1']</span>，<span id="anum">$clbpara['randver2']</span>，<span id="anum">$clbpara['randver3']</span></span>】<br>
 	<!--{/if}-->
-	<!--{if $clbpara['BGMBrand']=='rixolamal'}--> 
+	<!--{if $clbpara['BGMBrand']=='rixolamal'}-->
 	【<span class="lime">你投出的骰子数量：<span id="anum">$clbpara['diceRolled']</span></span>】<br>
 	<br>
 	【🍀<span class="minirainbow">你正在反叛随机数大神！</span>🍀】<br>
@@ -69,8 +69,8 @@
 	<!--{/if}-->
 
 	<!-- 第 1 行 : 包裹相关-->
-	<!--{if $club==20}--> 
-		<!--{if $clbstatusa}--> 
+	<!--{if $club==20}-->
+		<!--{if $clbstatusa}-->
 		<input type="button" class="cmdbutton" id="elementmix" name="elementmix" value="■■■■" onclick="$('command').value='itemmain';$('subcmd').name='itemcmd';$('subcmd').value='elementmix';postCmd('gamecmd','command.php');this.disabled=true;">
 		<!--{else}-->
 		<input type="button" class="cmdbutton" id="elementmix" name="elementmix" value="元素口袋" onclick="$('command').value='itemmain';$('subcmd').name='itemcmd';$('subcmd').value='elementmix';postCmd('gamecmd','command.php');this.disabled=true;">
@@ -127,7 +127,7 @@
 	<br>
 
 	<!-- 第 3.5 行：队伍指令-->
-	<!--{if $gamestate < 40}-->
+	<!--{if $gamestate < 40 && $club != 22}-->
 		<!--{if !$teamID}-->
 		<span tooltip="消耗{$team_sp}点体力，创建一支队伍">
 			<input type="button" class="cmdbutton" id="teammake" name="teammake" value="组建队伍" onclick="$('command').value='team';$('subcmd').name='teamcmd';$('subcmd').value='teammake';postCmd('gamecmd','command.php');this.disabled=true;">
@@ -138,6 +138,12 @@
 		<!--{else}-->
 		<input type="button" class="cmdbutton" id="teammake" name="teamquit" value="脱离队伍" onclick="$('command').value='team';$('subcmd').name='teamcmd';$('subcmd').value='teamquit';postCmd('gamecmd','command.php');this.disabled=true;">
 		<!--{/if}-->
+	<br />
+	<!--{/if}-->
+	<!--{if $club == 22}-->
+	<span tooltip="枫火歌者无法组队，但可以收纳种火作为随从">
+		<input type="button" class="cmdbutton" id="fireseed_manage" name="fireseed_manage" value="种火管理" onclick="openSidePanelToFireseedTab();">
+	</span>
 	<br />
 	<!--{/if}-->
 

@@ -1,0 +1,31 @@
+# 修复背景图像显示和PHP Notice错误
+
+## 问题描述
+在游戏中，当玩家在不同位置切换时，模板会读取img\location下和位置pls编号相同的图像文件显示为背景。但有时，该功能显示的背景会出现错位，且输出以下notice：
+
+```
+Notice (8): Undefined variable: sdata in /volume1/web/gamedata/templates/1_header.tpl.php on line 36
+Notice (8): Trying to access array offset on value of type null in /volume1/web/gamedata/templates/1_header.tpl.php on line 36
+```
+
+## 问题分析
+1. 错误发生在header模板中，当尝试访问`$sdata['pls']`时，但在某些上下文中`$sdata`变量未定义。
+2. 模板试图根据玩家当前位置设置背景图像。
+3. 在某些页面加载时，`$sdata`变量可能不存在，导致PHP Notice错误。
+
+## 修复方案
+在templates/default/header.htm文件中，修改了背景图像设置的条件判断，添加了对`$sdata`变量和`$sdata['pls']`是否存在的检查：
+
+```php
+<!--{if (CURSCRIPT == 'game' && isset($sdata) && isset($sdata['pls']) && $sdata['pls']==$places)}-->
+```
+
+这样，只有当`$sdata`变量存在且`$sdata['pls']`也存在时，才会尝试设置背景图像，避免了在变量不存在时产生的PHP Notice错误。
+
+## 修复效果
+1. 消除了在页面加载时出现的PHP Notice错误
+2. 保持了背景图像功能的正常工作
+3. 提高了代码的健壮性，避免了在变量不存在时的错误
+
+## 技术说明
+在PHP中，访问未定义的变量或未定义变量的数组键会产生Notice级别的错误。通过使用`isset()`函数进行检查，可以避免这些错误。这是一种防御性编程的实践，确保代码在各种情况下都能正常工作。

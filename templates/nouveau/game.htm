@@ -1,0 +1,137 @@
+{template header}
+<div id="notice"></div>
+<div id="ingamebgm" style="display:none">
+    <!--{eval $bgm = init_bgm(1)}-->
+    $bgm
+</div>
+<script type="text/javascript">var CURSCRIPT = 'game';</script>
+<!--{eval $bgurl = "img/location/".$pls.".jpg";}-->
+<style>
+    body.nouveau-ui .nouveau-desktop-bg {
+        background-image:
+            linear-gradient(rgba(255,255,255,.025) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(255,255,255,.025) 1px, transparent 1px),
+            linear-gradient(rgba(16,19,21,.54), rgba(16,19,21,.88)),
+            url("$bgurl"),
+            url("img/nouveau/placeholders/location-default.svg");
+        background-size: 32px 32px, 32px 32px, cover, cover, cover;
+        background-position: 0 0, 0 0, center, center, center;
+    }
+</style>
+
+<form method="post" id="gamecmd" name="gamecmd" style="margin:0">
+<div class="nv-game-shell">
+    <div id="main">
+    <!--{if $main=='battle'}-->
+    {template battle}
+    <!--{elseif $main=='battle_rev'}-->
+    {template battle_rev}
+    <!--{elseif $main=='itemmix_tips'}-->
+    <section class="nv-window nv-window--battle" id="nv-mix-tips" data-window-title="Item Mix">
+        <div class="nv-window__titlebar">
+            <span class="nv-window__title">Mix Terminal / 合成索引</span>
+            <span class="nv-window__actions"><button type="button" class="nv-window__action" data-window-minimize title="Minimize">_</button></span>
+        </div>
+        <div class="nv-window__body nv-compat">{template itemmix_tips}</div>
+    </section>
+    <!--{else}-->
+    {template profile}
+    <!--{/if}-->
+    </div>
+
+    <section class="nv-window nv-window--map" id="nv-map" data-window-title="Map">
+        <div class="nv-window__titlebar">
+            <span class="nv-window__title">Tactical Topology / 战术拓扑</span>
+            <span class="nv-window__actions"><button type="button" class="nv-window__action" data-window-minimize title="Minimize">_</button></span>
+        </div>
+        <div class="nv-window__body">
+            <div class="nv-map-current">
+                <span>Current Node</span>
+                <strong data-nv-pls>
+                    <!--{if !isset($plsinfo[$pls]) && isset($hplsinfo[$pgroup])}-->
+                        $hplsinfo[$pgroup][$pls]
+                    <!--{else}-->
+                        $plsinfo[$pls]
+                    <!--{/if}-->
+                </strong>
+            </div>
+            <div class="nv-map-nodes">
+                <!--{if !isset($plsinfo[$pls]) && isset($hplsinfo[$pgroup])}-->
+                    <!--{loop $hplsinfo[$pgroup] $key $value}-->
+                    <div class="nv-map-node <!--{if $pls == $key}-->is-current<!--{/if}-->">
+                        <span>$value</span>
+                        <span>$xyinfo['hidden']</span>
+                    </div>
+                    <!--{/loop}-->
+                <!--{else}-->
+                    <!--{loop $plsinfo $key $value}-->
+                    <div class="nv-map-node <!--{if $pls == $key}-->is-current<!--{/if}--> <!--{if array_search($key,$arealist) <= $areanum && !$hack}-->is-danger<!--{elseif array_search($key,$arealist) == $areanum + 1 && !$hack}-->is-warning<!--{/if}-->">
+                        <span>$value</span>
+                        <span>$xyinfo[$key]</span>
+                    </div>
+                    <!--{/loop}-->
+                <!--{/if}-->
+            </div>
+            <p class="nv-note">移动仍由行动窗口中的旧移动指令提交，不改变地点移动规则。</p>
+        </div>
+    </section>
+
+    <section class="nv-window nv-window--action" id="nv-action" data-window-title="Actions">
+        <div class="nv-window__titlebar">
+            <span class="nv-window__title">Action Console / 行动控制</span>
+            <span class="nv-window__actions"><button type="button" class="nv-window__action" data-window-minimize title="Minimize">_</button></span>
+        </div>
+        <div class="nv-window__body">
+            <div id="cmd" class="nv-command-legacy">
+                <!--{if $hp <= 0}-->
+                {template death}
+                <!--{elseif $state >=1 && $state <= 3}-->
+                {template rest}
+                <!--{elseif $itms0}-->
+                {template itemfind}
+                <!--{elseif $cmd}-->
+                $cmd
+                <!--{else}-->
+                {template command}
+                <!--{/if}-->
+            </div>
+        </div>
+    </section>
+
+    <section class="nv-window nv-window--log" id="nv-log-window" data-window-title="Log" data-window-resizable="true">
+        <div class="nv-window__titlebar">
+            <span class="nv-window__title">Signal Log / 行动日志</span>
+            <span class="nv-window__actions"><button type="button" class="nv-window__action" data-window-minimize title="Minimize">_</button></span>
+        </div>
+        <div class="nv-window__body">
+            <div class="nv-status-head">
+                <span id="pls" data-nv-pls>
+                    <!--{if !isset($plsinfo[$pls]) && isset($hplsinfo[$pgroup])}-->
+                    $hplsinfo[$pgroup][$pls]
+                    <!--{else}-->
+                    $plsinfo[$pls]
+                    <!--{/if}-->
+                </span>
+                <span class="red">剩余：<span id="anum">$alivenum</span>人</span>
+            </div>
+            <div id="log" class="nv-log">$log</div>
+        </div>
+    </section>
+</div>
+</form>
+
+<section class="nv-window nv-window--chat" id="nv-chat-window" data-window-title="Chat">
+    <div class="nv-window__titlebar">
+        <span class="nv-window__title">Comms / 聊天</span>
+        <span class="nv-window__actions"><button type="button" class="nv-window__action" data-window-minimize title="Minimize">_</button></span>
+    </div>
+    <div class="nv-window__body nv-chat-wrap">{template chat}</div>
+</section>
+
+<div id="hidden-model">
+    <!--{if !empty($clbpara['noskip_dialogue']) && $clbpara['noskip_dialogue'] == 'opening'}-->
+        {template opening}
+    <!--{/if}-->
+</div>
+{template slidingpanel}
+{template footer}

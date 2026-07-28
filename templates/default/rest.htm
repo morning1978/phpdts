@@ -3,3 +3,6 @@ $restinfo[$state] 中。。。<br>
 <input type="hidden" id="command" name="command" value="rest">
 <input type="button" class="cmdbutton" id="zz" name="rest" value="[Z]{$restinfo[$state]}" onclick="postCmd('gamecmd','command.php');this.disabled=true;">
 <input type="button" class="cmdbutton" id="x" name="back" value="[X]返回" onclick="$('command').value='back';postCmd('gamecmd','command.php');this.disabled=true;">
+<!--{if in_array($pls, array(1, 2, 3, 4, 5, 6, 9))}-->
+<input type="button" class="cmdbutton" id="f" name="fishing" value="[F]钓鱼" onclick="$('command').value='fishing';postCmd('gamecmd','command.php');this.disabled=true;">
+<!--{/if}-->

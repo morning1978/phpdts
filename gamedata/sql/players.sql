@@ -163,7 +163,7 @@ CREATE TABLE bra_players (
   statusc int(10) NOT NULL default '0',
   statusd int(10) NOT NULL default '0',
   statuse int(10) NOT NULL default '0',
-  clbpara text NOT NULL,
+  clbpara mediumtext NOT NULL,
   clbstatusa int(10) NOT NULL default '0',
   clbstatusb int(10) NOT NULL default '0',
   clbstatusc int(10) NOT NULL default '0',

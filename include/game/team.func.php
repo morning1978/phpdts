@@ -63,6 +63,17 @@ function teammake($tID,$tPass,$tIcon) {
 		$log .= '体力不足，不能创建队伍。至少需要<span class="yellow">'.$team_sp.'</span>点体力。<br>';
 	} else {
 		//创建队伍时，队伍计数+1
+		// 确保 clbpara 是数组
+		if(!is_array($clbpara)) {
+			if(is_string($clbpara)) {
+				$clbpara = json_decode($clbpara, true);
+			}
+			if(!is_array($clbpara)) {
+				$clbpara = array();
+			}
+		}
+		// 确保 achvars 数组存在
+		if(!isset($clbpara['achvars'])) $clbpara['achvars'] = array();
 		if(empty($clbpara['achvars']['team'])) $clbpara['achvars']['team'] = 1;
 
 		$result = $db->query("SELECT pid FROM {$tablepre}players WHERE teamID='$tID'");
@@ -122,6 +133,17 @@ function teamjoin($tID,$tPass) {
 	} else {
 
 		//加入队伍时，队伍计数+1
+		// 确保 clbpara 是数组
+		if(!is_array($clbpara)) {
+			if(is_string($clbpara)) {
+				$clbpara = json_decode($clbpara, true);
+			}
+			if(!is_array($clbpara)) {
+				$clbpara = array();
+			}
+		}
+		// 确保 achvars 数组存在
+		if(!isset($clbpara['achvars'])) $clbpara['achvars'] = array();
 		if(empty($clbpara['achvars']['team'])) $clbpara['achvars']['team'] = 1;
 
 		$result = $db->query("SELECT teamPass,teamIcon FROM {$tablepre}players WHERE teamID='$tID'");

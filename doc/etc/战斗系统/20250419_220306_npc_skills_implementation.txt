@@ -1,0 +1,138 @@
+# NPC技能实装：解放（npc_wrelease）和飞行（npc_flying）
+
+## 功能概述
+
+实现了两个专为NPC设计的技能：
+1. **解放（npc_wrelease）**：开关技，打开后可在额外消耗2倍，3倍，4倍与5倍之间切换，探索时消耗的体力增加这个倍数。在进行战斗时，只在战斗计算中基础攻击力（base_att）与防御力（base_def）增加这个倍数。
+2. **飞行（npc_flying）**：被动技，移动不消耗体力值。
+
+## 实装内容
+
+1. 在 `gamedata/cache/clubskills_1.php` 文件中添加了 `npc_wrelease` 和 `npc_flying` 技能的定义
+2. 在 `include/game/search.func.php` 文件中实现了飞行技能的移动不消耗体力效果
+3. 在 `include/game/search.func.php` 文件中实现了解放技能的探索体力消耗增加效果
+4. 在 `include/game/revattr.func.php` 文件中实现了解放技能的战斗基础攻击力和防御力增加效果
+
+## 实装细节
+
+### 1. 技能定义
+
+在 `clubskills_1.php` 文件中添加了以下技能定义：
+
+```php
+'npc_wrelease' => Array
+(
+    'name' => '解放',
+    'tags' => Array('switch'),
+    'desc' => '开关技，打开后可在额外消耗2倍，3倍，4倍与5倍之间切换，探索时消耗的体力增加这个倍数。在进行战斗时，只在战斗计算中基础攻击力（base_att）与防御力（base_def）增加这个倍数。',
+    'svars' => Array(
+        'active' => 0, // 初始不激活
+        'level' => 2, // 初始倍数为2
+    ),
+),
+'npc_flying' => Array
+(
+    'name' => '飞行',
+    'tags' => Array('passive'),
+    'desc' => '被动技，移动不消耗体力值',
+),
+```
+
+### 2. 飞行技能实现
+
+在 `search.func.php` 文件的 `calc_move_search_sp_cost` 函数中添加了飞行技能的处理逻辑：
+
+```php
+# 「飞行」技能判定：移动不消耗体力
+if($act == 'move' && !empty($clbpara['skill']) && in_array('npc_flying', $clbpara['skill']))
+{
+    $actlog = "你展开双翼，飞向了目的地";
+    return 'sp';
+}
+```
+
+这段代码检查玩家是否拥有飞行技能，如果有且当前动作是移动，则设置移动日志并直接返回，不消耗体力。
+
+### 3. 解放技能实现 - 探索体力消耗
+
+在 `search.func.php` 文件的 `calc_move_search_sp_cost` 函数中添加了解放技能的体力消耗处理逻辑：
+
+```php
+# 「解放」技能判定：探索时消耗的体力增加
+if(!empty($clbpara['skill']) && in_array('npc_wrelease', $clbpara['skill']) && !empty($clbpara['skillpara']['npc_wrelease']['active']))
+{
+    $level = isset($clbpara['skillpara']['npc_wrelease']['level']) ? $clbpara['skillpara']['npc_wrelease']['level'] : 2;
+    $costsp *= $level;
+}
+```
+
+这段代码检查玩家是否拥有解放技能且技能处于激活状态，如果是，则根据技能等级（2-5倍）增加体力消耗。
+
+### 4. 解放技能实现 - 战斗攻击力增加
+
+在 `revattr.func.php` 文件的 `get_base_att_modifier` 函数中添加了解放技能的攻击力增加处理逻辑：
+
+```php
+# 「解放」技能判定：基础攻击力增加
+if(!empty($pa['clbpara']['skill']) && in_array('npc_wrelease', $pa['clbpara']['skill']) && !empty($pa['clbpara']['skillpara']['npc_wrelease']['active']))
+{
+    $level = isset($pa['clbpara']['skillpara']['npc_wrelease']['level']) ? $pa['clbpara']['skillpara']['npc_wrelease']['level'] : 2;
+    $base_att *= $level;
+    if(!$tooltip) $log .= "<span class='yellow'>「解放」技能发动！{$pa['nm']}的基础攻击力增加了{$level}倍！</span><br>";
+}
+```
+
+这段代码检查攻击方是否拥有解放技能且技能处于激活状态，如果是，则根据技能等级（2-5倍）增加基础攻击力。
+
+### 5. 解放技能实现 - 战斗防御力增加
+
+在 `revattr.func.php` 文件的 `get_base_def` 函数中添加了解放技能的防御力增加处理逻辑：
+
+```php
+# 「解放」技能判定：基础防御力增加
+if(!empty($pd['clbpara']['skill']) && in_array('npc_wrelease', $pd['clbpara']['skill']) && !empty($pd['clbpara']['skillpara']['npc_wrelease']['active']))
+{
+    $level = isset($pd['clbpara']['skillpara']['npc_wrelease']['level']) ? $pd['clbpara']['skillpara']['npc_wrelease']['level'] : 2;
+    $base_def *= $level;
+    if(!$tooltip) $log .= "<span class='yellow'>「解放」技能发动！{$pd['nm']}的基础防御力增加了{$level}倍！</span><br>";
+}
+```
+
+这段代码检查防守方是否拥有解放技能且技能处于激活状态，如果是，则根据技能等级（2-5倍）增加基础防御力。
+
+## 使用方法
+
+### 为NPC添加飞行技能
+
+```php
+$npc['clbpara']['skill'][] = 'npc_flying';
+```
+
+### 为NPC添加解放技能
+
+```php
+// 添加技能
+$npc['clbpara']['skill'][] = 'npc_wrelease';
+
+// 初始化技能参数（如果不存在）
+if(!isset($npc['clbpara']['skillpara']['npc_wrelease'])) {
+    $npc['clbpara']['skillpara']['npc_wrelease'] = array(
+        'active' => 0,  // 初始不激活
+        'level' => 2    // 初始倍数为2
+    );
+}
+
+// 激活技能
+$npc['clbpara']['skillpara']['npc_wrelease']['active'] = 1;
+
+// 设置倍数级别（2-5）
+$npc['clbpara']['skillpara']['npc_wrelease']['level'] = 3; // 设置为3倍
+```
+
+## 注意事项
+
+1. 这两个技能专为NPC设计，玩家不应该获得这些技能
+2. 解放技能是开关技，需要先激活才能生效
+3. 解放技能的倍数可以在2-5之间设置，影响体力消耗、攻击力和防御力的增幅
+4. 飞行技能只影响移动消耗，不影响探索消耗
+5. 解放技能的体力消耗增加可能会导致NPC在探索时更快地消耗体力，需要注意平衡

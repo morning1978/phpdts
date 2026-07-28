@@ -29,6 +29,7 @@ gamedata/combatinfo.php
 gamedata/newsinfo.php
 gamedata/gameinfo.php
 gamedata/system.php
+gamedata/revbot_action.lock
 gamedata/banlist.list
 gamedata/banlist.php
 gamedata/clearlog.php
@@ -109,3 +110,6 @@ gamedata/adminlog.php
 config.inc.php
 templates/default/lastgb.htm
 img/NPCAvatar_Temp.psd
+/doc/etc/archive
+/test
+diff_copy.bat
